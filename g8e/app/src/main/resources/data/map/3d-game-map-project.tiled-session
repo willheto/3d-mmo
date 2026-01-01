@@ -1,0 +1,48 @@
+{
+    "Map/SizeTest": {
+        "height": 4300,
+        "width": 2
+    },
+    "activeFile": "tiles.tsx",
+    "expandedProjectPaths": [
+        "."
+    ],
+    "fileStates": {
+        "#tiles": {
+            "dynamicWrapping": true
+        },
+        "tiled_project.tmx": {
+            "scale": 1,
+            "selectedLayer": 0,
+            "viewCenter": {
+                "x": 866.5,
+                "y": 733
+            }
+        },
+        "tiled_project.tmx#tiles": {
+            "scaleInDock": 1
+        },
+        "tiles.tsx": {
+            "dynamicWrapping": true,
+            "scaleInDock": 2,
+            "scaleInEditor": 23
+        }
+    },
+    "last.exportedFilePath": "C:/Users/henri/dev/3d-mmo/g8e/app/src/main/resources/data/map",
+    "last.imagePath": "C:/Users/henri/dev/3d-mmo/g8e/app/src/main/resources/data/tiles",
+    "map.height": 50,
+    "map.lastUsedExportFilter": "CSV files (*.csv)",
+    "map.lastUsedFormat": "tmx",
+    "map.width": 50,
+    "openFiles": [
+        "tiled_project.tmx",
+        "tiles.tsx"
+    ],
+    "project": "3d-game-map-project.tiled-project",
+    "recentFiles": [
+        "tiles.tsx",
+        "tiled_project.tmx"
+    ],
+    "tileset.lastUsedFormat": "tsx",
+    "tileset.type": 0
+}

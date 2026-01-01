@@ -1,0 +1,79 @@
+############################
+# OS
+############################
+.DS_Store
+Thumbs.db
+
+############################
+# IDEs / Editors
+############################
+.idea/
+*.iml
+.vscode/
+.project
+.classpath
+.settings/
+
+############################
+# Java
+############################
+# Compiled class files
+*.class
+
+# Logs
+*.log
+
+# JVM crash logs
+hs_err_pid*
+
+# Maven
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+dependency-reduced-pom.xml
+.buildNumber
+
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+############################
+# TypeScript / Node
+############################
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build output
+dist/
+out/
+build/
+
+# TypeScript cache
+*.tsbuildinfo
+
+############################
+# Environment variables
+############################
+.env
+.env.local
+.env.*.local
+
+############################
+# Coverage / reports
+############################
+coverage/
+*.lcov
+
+############################
+# Misc
+############################
+tmp/
+temp/
+bin/
+
