@@ -4,11 +4,13 @@ import { Entity } from '../entity';
 import NpcInteraction from '../../npcInteractions/NpcInteraction';
 import { canvas2d } from '../../graphics/2DCanvas';
 import Draw2D from '../../graphics/Draw2D';
+import { ExperienceUtils } from '../../util/ExperienceCurve';
 
 export default class Player extends Entity {
 	public storyProgress: number = 0;
 	private attackTimer: number = 0;
 	private readonly ATTACK_DURATION = 0.25; // seconds
+	public attackStyle = '';
 
 	constructor(world: World, entityID: string) {
 		super(world, entityID);
@@ -16,7 +18,7 @@ export default class Player extends Entity {
 	}
 
 	private setupPlayer(): void {
-		this.makeHumanModel(0x8b1e1e, 0x000000);
+		this.makeHumanModel(0x335533, 0x222222);
 		if (this.world.currentPlayerID !== this.entityID) {
 			this.model.traverse(obj => {
 				if ((obj as THREE.Mesh).isMesh) {
@@ -28,25 +30,55 @@ export default class Player extends Entity {
 	}
 
 	update(player: SocketPlayer): void {
-		this.worldX = player.worldX;
-		this.worldY = player.worldY;
-
-		if (this.world.currentPlayerID === this.entityID) {
-			this.world.client.audioManager.playAreaMusic(this.worldX, this.worldY);
+		if (player.worldX !== undefined) {
+			this.worldX = player.worldX;
+		}
+		if (player.worldY !== undefined) {
+			this.worldY = player.worldY;
 		}
 
-		this.currentChunk = player.currentChunk;
+		if (player.attackStyle !== undefined) {
+			this.attackStyle = player.attackStyle;
+		}
 
-		this.nextTileDirection = player.nextTileDirection;
+		if (player.facingDirection !== undefined) {
+			this.facingDirection = player.facingDirection;
+		}
+		if (player.nextTileDirection !== undefined) {
+			this.nextTileDirection = player.nextTileDirection;
+		}
 
-		this.name = player.name;
+		if (player.username !== undefined) this.name = player.username;
+		if (player.inventory !== undefined) this.inventory = player.inventory;
+		if (player.inventoryAmounts !== undefined) this.inventoryAmounts = player.inventoryAmounts;
+		if (player.storyProgress !== undefined) this.storyProgress = player.storyProgress;
+		if (player.currentHitpoints !== undefined) this.currentHitpoints = player.currentHitpoints;
+		if (player.isInCombat !== undefined) this.isInCombat = player.isInCombat;
+		if (player.skills !== undefined) this.skills = player.skills;
 
-		this.facingDirection = player.facingDirection;
-		this.inventory = player.inventory;
-		this.inventoryAmounts = player.inventoryAmounts;
-		this.storyProgress = player.storyProgress;
-		this.currentHitpoints = player.currentHitpoints;
-		this.isInCombat = player.isInCombat;
+		if (player.weapon) {
+			if (player.weapon === -1) {
+				this.removeWeapon();
+				this.weapon = player.weapon || -1;
+			}
+
+			if (player.weapon > 0) {
+				const itemIndex = player.inventory[player.weapon];
+				this.loadWieldable(itemIndex);
+				this.weapon = player.weapon;
+			}
+		}
+
+		if (player.shield) {
+			if (player.shield === -1) {
+				this.removeShield();
+				this.shield = player.shield || -1;
+			} else {
+				const itemIndex = player.inventory[player.shield];
+				this.loadWieldable(itemIndex);
+				this.shield = player.shield;
+			}
+		}
 
 		if (this.isDying && !this.hasDied) {
 			this.deathTimer = this.DEATH_DURATION;
@@ -54,7 +86,7 @@ export default class Player extends Entity {
 		}
 
 		// Respawn / revive detected
-		if (!player.isDying && this.hasDied) {
+		if (player.isDying !== undefined && player.isDying === false && this.hasDied) {
 			this.resetPose();
 		}
 
@@ -75,7 +107,8 @@ export default class Player extends Entity {
 			const screenX = (screenPos.x * 0.5 + 0.5) * canvas2d.canvas.width;
 			const screenY = (-screenPos.y * 0.5 + 0.5) * canvas2d.canvas.height;
 
-			Draw2D.drawHealthBar2D(screenX | 0, screenY | 0, this.currentHitpoints, 10);
+			const hitpoints = ExperienceUtils.getLevelByExp(this.skills[3]);
+			Draw2D.drawHealthBar2D(screenX | 0, screenY | 0, this.currentHitpoints, hitpoints);
 		}
 
 		const playerTalkEvents = this.world.talkEvents.filter(event => event.talkerID === this.world.currentPlayerID);
@@ -168,7 +201,7 @@ export default class Player extends Entity {
 				currentYaw + THREE.MathUtils.clamp(delta, -this.TURN_SPEED * dt, this.TURN_SPEED * dt);
 		}
 
-		if (this?.nextTileDirection) {
+		if (this?.nextTileDirection !== 'NONE') {
 			this.walkTime += dt * 8;
 
 			let nextX = this.worldX;

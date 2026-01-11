@@ -1,12 +1,14 @@
 package com.g8e.gameserver.tile;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 
 import com.g8e.gameserver.World;
+import com.g8e.util.Logger;
 
-public class TileManager {
+public final class TileManager {
 
     final private World world;
     public Tile[] tile;
@@ -59,9 +61,9 @@ public class TileManager {
                 distance++;
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            Logger.printError(e.getMessage());
         }
-        return null; // In case no walkable tile is found (very unlikely in a proper world setup)
+        return null; // In case no walkable tile is found
     }
 
     public int getChunkByWorldXandY(int worldX, int worldY) {
@@ -72,7 +74,7 @@ public class TileManager {
             int chunkY = worldY / chunkSize;
             return chunkX + chunkY * (world.maxWorldCol / chunkSize);
         } catch (Exception e) {
-            e.printStackTrace();
+            Logger.printError(e.getMessage());
         }
         return -1;
     }
@@ -94,7 +96,7 @@ public class TileManager {
 
             return neighbors;
         } catch (Exception e) {
-            e.printStackTrace();
+            Logger.printError(e.getMessage());
         }
         return null;
     }
@@ -109,7 +111,7 @@ public class TileManager {
             }
             return tile[index];
         } catch (Exception e) {
-            e.printStackTrace();
+            Logger.printError(e.getMessage());
         }
         return null;
     }
@@ -132,7 +134,7 @@ public class TileManager {
             }
 
         } catch (Exception e) {
-            e.printStackTrace();
+            Logger.printError(e.getMessage());
         }
         return false;
     }
@@ -150,7 +152,7 @@ public class TileManager {
         try {
             tile[index] = new Tile(collision, index);
         } catch (Exception e) {
-            e.printStackTrace();
+            Logger.printError(e.getMessage());
         }
     }
 
@@ -158,46 +160,45 @@ public class TileManager {
     public void loadMap(String filePath, int layer) {
         try {
             InputStream is = getClass().getResourceAsStream(filePath);
-            BufferedReader br = new BufferedReader(new InputStreamReader(is));
-
-            int col = 0;
-            int row = 0;
-
-            while (col < world.maxWorldCol && row < world.maxWorldRow) {
-                String line = br.readLine();
-
-                while (col < world.maxWorldCol) {
-                    String numbers[] = line.split(",");
-                    int num = Integer.parseInt(numbers[col]);
-
-                    // Depending on the layer, assign the number to the respective map
-                    switch (layer) {
-                        case 1:
-                            mapTileNumLayer1[col][row] = num;
-                            break;
-                        case 2:
-                            mapTileNumLayer2[col][row] = num;
-                            break;
-                        case 3:
-                            mapTileNumLayer3[col][row] = num;
-                            break;
-                        case 4:
-                            mapTileNumLayer4[col][row] = num;
-                            break;
-                        default:
-                            break;
+            try (BufferedReader br = new BufferedReader(new InputStreamReader(is))) {
+                int col = 0;
+                int row = 0;
+                
+                while (col < world.maxWorldCol && row < world.maxWorldRow) {
+                    String line = br.readLine();
+                    
+                    while (col < world.maxWorldCol) {
+                        String numbers[] = line.split(",");
+                        int num = Integer.parseInt(numbers[col]);
+                        
+                        // Depending on the layer, assign the number to the respective map
+                        switch (layer) {
+                            case 1:
+                                mapTileNumLayer1[col][row] = num;
+                                break;
+                            case 2:
+                                mapTileNumLayer2[col][row] = num;
+                                break;
+                            case 3:
+                                mapTileNumLayer3[col][row] = num;
+                                break;
+                            case 4:
+                                mapTileNumLayer4[col][row] = num;
+                                break;
+                            default:
+                                break;
+                        }
+                        col++;
                     }
-                    col++;
-                }
-                if (col == world.maxWorldCol) {
-                    col = 0;
-                    row++;
+                    if (col == world.maxWorldCol) {
+                        col = 0;
+                        row++;
+                    }
                 }
             }
-            br.close();
 
-        } catch (Exception e) {
-            e.printStackTrace();
+        } catch (IOException | NumberFormatException e) {
+            Logger.printError(e.getMessage());
         }
     }
 

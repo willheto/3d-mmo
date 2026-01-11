@@ -3,6 +3,7 @@ import { World } from '../../world/World';
 import { Entity } from '../entity';
 import { canvas2d } from '../../graphics/2DCanvas';
 import Draw2D from '../../graphics/Draw2D';
+import { ExperienceUtils } from '../../util/ExperienceCurve';
 
 export default class Npc extends Entity {
 	private attackTimer: number = 0;
@@ -12,19 +13,40 @@ export default class Npc extends Entity {
 
 	constructor(world: World, entityID: string) {
 		super(world, entityID);
-		this.setupNpc();
 	}
 
-	update(npc: SocketNpc): void {
-		this.worldX = npc.worldX;
-		this.worldY = npc.worldY;
-		this.currentChunk = npc.currentChunk;
-		this.nextTileDirection = npc.nextTileDirection;
-		this.facingDirection = npc.facingDirection;
-		this.currentHitpoints = npc.currentHitpoints;
-		this.isInCombat = npc.isInCombat;
-		this.entityIndex = npc.entityIndex;
-		this.isDying = npc.isDying;
+	public update(npc: SocketNpc): void {
+		if (npc.worldX !== undefined) {
+			this.worldX = npc.worldX;
+		}
+
+		if (npc.worldY !== undefined) {
+			this.worldY = npc.worldY;
+		}
+
+		if (npc.nextTileDirection !== undefined) {
+			this.nextTileDirection = npc.nextTileDirection;
+		}
+
+		if (npc.facingDirection !== undefined) {
+			this.facingDirection = npc.facingDirection;
+		}
+
+		if (npc.currentHitpoints !== undefined) {
+			this.currentHitpoints = npc.currentHitpoints;
+		}
+
+		if (npc.isInCombat !== undefined) {
+			this.isInCombat = npc.isInCombat;
+		}
+
+		if (npc.isDying !== undefined) {
+			this.isDying = npc.isDying;
+		}
+
+		if (npc.npcIndex !== undefined) {
+			this.entityIndex = npc.npcIndex;
+		}
 
 		if (this.isDying && !this.hasDied) {
 			this.deathTimer = this.DEATH_DURATION;
@@ -32,17 +54,20 @@ export default class Npc extends Entity {
 		}
 
 		// Respawn / revive detected
-		if (!npc.isDying && this.hasDied) {
+		if (npc.isDying !== undefined && npc.isDying === false && this.hasDied) {
 			this.resetPose();
 		}
 
 		if (!this.isAddedToScene) {
+			this.setupNpc();
 			this.world.scene.add(this.model);
 			this.isAddedToScene = true;
 		}
 	}
 
-	setupNpc() {
+	public setupNpc(): void {
+		const staticData = this.world.entitiesManager.getEntityInfoByIndex(this.entityIndex);
+		this.skills = staticData?.skills || [];
 		this.makeHumanModel(0x8b1e1e, 0x000000);
 		this.model.traverse(obj => {
 			if ((obj as THREE.Mesh).isMesh) {
@@ -52,7 +77,7 @@ export default class Npc extends Entity {
 		});
 	}
 
-	drawNpc(dt: number): void {
+	public drawNpc(dt: number): void {
 		if (!this.limbs) return;
 
 		if (this.isInCombat) {
@@ -64,7 +89,8 @@ export default class Npc extends Entity {
 			const screenX = (screenPos.x * 0.5 + 0.5) * canvas2d.canvas.width;
 			const screenY = (-screenPos.y * 0.5 + 0.5) * canvas2d.canvas.height;
 
-			Draw2D.drawHealthBar2D(screenX | 0, screenY | 0, this.currentHitpoints, 10);
+			const hitpoints = ExperienceUtils.getLevelByExp(this.skills[3]);
+			Draw2D.drawHealthBar2D(screenX | 0, screenY | 0, this.currentHitpoints, hitpoints);
 		}
 
 		if (this.facingDirection) {
@@ -78,6 +104,7 @@ export default class Npc extends Entity {
 			this.model.rotation.y =
 				currentYaw + THREE.MathUtils.clamp(delta, -this.TURN_SPEED * dt, this.TURN_SPEED * dt);
 		}
+
 		if (this.hasDied && this.deathTimer > 0 && this.limbs) {
 			this.deathTimer -= dt;
 
@@ -142,7 +169,7 @@ export default class Npc extends Entity {
 			return; // IMPORTANT: skip walk animation this frame
 		}
 
-		if (this?.nextTileDirection) {
+		if (this?.nextTileDirection !== 'NONE') {
 			this.walkTime += dt * 8;
 
 			let nextX = this.worldX;
@@ -235,5 +262,62 @@ export default class Npc extends Entity {
 			}
 			return;
 		}
+	}
+
+	public onClick() {
+		// prevent immediate close
+		if (this.world.modalJustClosed) return;
+		this.world.canvas.style.pointerEvents = 'auto';
+
+		this.world.modalObject = {
+			modalX: this.world.mouseScreenX + 8,
+			modalY: this.world.mouseScreenY + 8,
+			modalOptions: [],
+		};
+
+		const npcData = this.world.entitiesManager.getEntityInfoByIndex(this.entityIndex);
+		if (!npcData) {
+			this.world.actions?.sendChatMessage(this.world.currentPlayerID, 'No data', false);
+			return;
+		}
+
+		if (npcData?.isTalkable) {
+			this.world.modalObject.modalOptions.push({
+				optionText: 'Talk-to ',
+				optionSecondaryText: {
+					text: npcData.name + ` (Level-${this.getCombatLevel()})`,
+					color: '#ffff66',
+				},
+				optionFunction: () => {
+					this.world.actions?.moveAndTalk(this.world.currentPlayerID, this.entityID);
+					this.world.modalObject = null;
+				},
+			});
+		}
+
+		if (npcData?.type === 2) {
+			this.world.modalObject.modalOptions.push({
+				optionText: 'Attack ',
+				optionSecondaryText: {
+					text: npcData.name + ` (level-${this.getCombatLevel()})`,
+					color: '#ffff66',
+				},
+				optionFunction: () => {
+					this.world.actions?.moveAndAttack(this.world.currentPlayerID, this.entityID);
+					this.world.modalObject = null;
+				},
+			});
+		}
+
+		this.world.modalObject.modalOptions.push({
+			optionText: 'Examine ',
+			optionSecondaryText: {
+				text: npcData.name + ` (Level-${this.getCombatLevel()})`,
+				color: '#ffff66',
+			},
+			optionFunction: () => {
+				this.world.actions?.sendChatMessage(this.world.currentPlayerID, npcData?.examine || 'No data', false);
+			},
+		});
 	}
 }

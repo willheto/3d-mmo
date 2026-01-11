@@ -1,7 +1,6 @@
 package com.g8e.gameserver;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -9,7 +8,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 import org.java_websocket.WebSocket;
 import org.java_websocket.exceptions.WebsocketNotConnectedException;
@@ -18,33 +16,29 @@ import com.g8e.gameserver.constants.NpcConstants;
 import com.g8e.gameserver.managers.EntitiesManager;
 import com.g8e.gameserver.managers.ItemsManager;
 import com.g8e.gameserver.managers.QuestsManager;
-import com.g8e.gameserver.managers.ShopsManager;
-import com.g8e.gameserver.managers.SpellsManager;
-import com.g8e.gameserver.network.actions.Action;
-import com.g8e.gameserver.network.compressing.Compress;
-import com.g8e.gameserver.network.dataTransferModels.DTONpc;
-import com.g8e.gameserver.network.dataTransferModels.DTOPlayer;
-import com.g8e.gameserver.tile.TileManager;
-import com.g8e.util.Logger;
-import com.google.gson.Gson;
 import com.g8e.gameserver.models.ChatMessage;
-import com.g8e.gameserver.models.Chunkable;
 import com.g8e.gameserver.models.entities.Entity;
-import com.g8e.gameserver.models.entities.EntityData;
 import com.g8e.gameserver.models.entities.Npc;
 import com.g8e.gameserver.models.entities.Player;
 import com.g8e.gameserver.models.events.AttackEvent;
 import com.g8e.gameserver.models.events.SoundEvent;
 import com.g8e.gameserver.models.events.TalkEvent;
-import com.g8e.gameserver.models.events.MagicEvent;
 import com.g8e.gameserver.models.events.TradeEvent;
 import com.g8e.gameserver.models.objects.Item;
 import com.g8e.gameserver.network.GameState;
-import com.g8e.gameserver.network.GameStateComparator;
 import com.g8e.gameserver.network.WebSocketEventsHandler;
+import com.g8e.gameserver.network.actions.Action;
+import com.g8e.gameserver.network.compressing.Compress;
+import com.g8e.gameserver.network.dataTransferModels.DTOItem;
+import com.g8e.gameserver.network.dataTransferModels.DTONpc;
+import com.g8e.gameserver.network.dataTransferModels.DTOPlayer;
+import com.g8e.gameserver.tile.TileManager;
+import com.g8e.util.Logger;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 
 public class World {
-    private static final int TICK_RATE = 600; // 600ms
+    private static final int TICK_RATE = 600;
     public final int maxWorldCol = 20;
     public final int maxWorldRow = 20;
     public final int maxPlayers = 1000;
@@ -54,22 +48,18 @@ public class World {
     public ItemsManager itemsManager = new ItemsManager(this);
     public EntitiesManager entitiesManager = new EntitiesManager();
     public QuestsManager questsManager = new QuestsManager();
-    public ShopsManager shopsManager = new ShopsManager();
-    public SpellsManager spellsManager = new SpellsManager();
-    public List<Player> players = new ArrayList<Player>();
-    public List<Npc> npcs = new ArrayList<Npc>();
-    public List<Item> items = new ArrayList<Item>();
-    public List<ChatMessage> chatMessages = new ArrayList<ChatMessage>();
-    public List<Action> actionQueue = new ArrayList<Action>();
-    public List<AttackEvent> tickAttackEvents = new ArrayList<AttackEvent>();
-    public List<TalkEvent> tickTalkEvents = new ArrayList<TalkEvent>();
-    public List<TradeEvent> tickTradeEvents = new ArrayList<TradeEvent>();
-    public List<SoundEvent> tickSoundEvents = new ArrayList<SoundEvent>();
-    public List<MagicEvent> tickMagicEvents = new ArrayList<MagicEvent>();
+    public List<Player> players = new ArrayList<>();
+    public List<Npc> npcs = new ArrayList<>();
+    public List<Item> items = new ArrayList<>();
+    public List<ChatMessage> chatMessages = new ArrayList<>();
+    public List<Action> actionQueue = new ArrayList<>();
+    public List<AttackEvent> tickAttackEvents = new ArrayList<>();
+    public List<TalkEvent> tickTalkEvents = new ArrayList<>();
+    public List<TradeEvent> tickTradeEvents = new ArrayList<>();
+    public List<SoundEvent> tickSoundEvents = new ArrayList<>();
 
-    public GameState previousGameState;
     public WebSocket[] connections = new WebSocket[maxPlayers];
-    public List<String> onlinePlayers = new ArrayList<String>();
+    public List<String> onlinePlayers = new ArrayList<>();
 
     public final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     private final Map<String, ScheduledFuture<?>> combatChecks = new ConcurrentHashMap<>();
@@ -113,13 +103,14 @@ public class World {
                 Thread.sleep(TICK_RATE);
                 gameTick();
             } catch (InterruptedException e) {
-                e.printStackTrace();
+                Logger.printError(e.getMessage());
             }
         }
     }
 
     public void addChatMessage(ChatMessage chatMessage) {
         this.chatMessages.add(chatMessage);
+        Logger.printDebug(chatMessage.getMessage());
     }
 
     public List<ChatMessage> getChatMessages() {
@@ -145,17 +136,53 @@ public class World {
                     .toList();
             this.actionQueue.removeAll(actionsToRemove);
 
-            this.npcs.forEach(npc -> npc.update());
+            this.npcs.forEach(npc -> {
+                npc.update();
+            });
             itemsManager.updateDespawnTimers();
             sentGameStateToConnections();
+            cleanUpData();
         } catch (Exception e) {
-            Logger.printError("Error in gameTick: " + e.getMessage());
-            e.printStackTrace();
+            Logger.printError(e.getMessage());
         }
     }
 
+    private void cleanUpData() {
+        this.chatMessages.clear();
+
+        this.players.forEach(player -> {
+            player.clearChangedFlags();
+        });
+
+        this.npcs.forEach(npc -> {
+            npc.clearChangedFlags();
+        });
+
+        this.items.forEach(npc -> {
+            npc.clearChangedFlags();
+        });
+    }
+
     private void sentGameStateToConnections() {
-        GameState newGameState = getChangedGameState();
+        List<DTOPlayer> dtoPlayers = this.players.stream()
+                .map(DTOPlayer::new)
+                .filter(dto -> !dto.hasOnlyEntityId())
+                .toList();
+        List<DTONpc> dtoNpcs = this.npcs.stream()
+                .map(DTONpc::new)
+                .filter(dto -> !dto.hasOnlyEntityId())
+                .toList();
+
+        List<DTOItem> dtoItems = this.items.stream()
+                .map(DTOItem::new)
+                .filter(dto -> !dto.hasOnlyUniqueId())
+                .toList();
+
+        GameState newGameState = new GameState(this.tickAttackEvents, this.tickTalkEvents, this.tickTradeEvents,
+                this.tickSoundEvents,
+                dtoPlayers, dtoNpcs,
+                this.chatMessages,
+                dtoItems, null, this.onlinePlayers);
 
         for (WebSocket conn : connections) {
             if (conn != null) {
@@ -163,37 +190,9 @@ public class World {
                         .orElse(null);
 
                 if (player != null) {
-                    int[] neighborChunks = tileManager.getNeighborChunks(player.currentChunk);
-
-                    if (player.needsFullChunkUpdate) {
-                        List<DTONpc> npcsInCurrentAndNeighborChunks = getEntitiesInCurrentAndNeighborChunks(player,
-                                this.npcs, neighborChunks)
-                                .stream().map(DTONpc::new).toList();
-
-                        List<DTOPlayer> playersInCurrentAndNeighborChunks = getEntitiesInCurrentAndNeighborChunks(
-                                player, this.players, neighborChunks)
-                                .stream().map(DTOPlayer::new).toList();
-
-                        newGameState.setNpcs(npcsInCurrentAndNeighborChunks);
-                        newGameState.setPlayers(playersInCurrentAndNeighborChunks);
-                        player.needsFullChunkUpdate = false;
-                    } else {
-                        List<DTONpc> npcsInCurrentAndNeighborChunks = getEntitiesInCurrentAndNeighborChunks(player,
-                                newGameState.getNpcs(), neighborChunks);
-                        List<DTOPlayer> playersInCurrentAndNeighborChunks = getEntitiesInCurrentAndNeighborChunks(
-                                player, newGameState.getPlayers(), neighborChunks);
-
-                        newGameState.setNpcs(npcsInCurrentAndNeighborChunks);
-                        newGameState.setPlayers(playersInCurrentAndNeighborChunks);
-
-                        // add current player if not in the list
-                        if (playersInCurrentAndNeighborChunks.stream()
-                                .noneMatch(p -> p.getEntityID().equals(player.entityID))) {
-                            playersInCurrentAndNeighborChunks.add(new DTOPlayer(player));
-                        }
-                    }
-
-                    String gameStateJson = new Gson().toJson(newGameState);
+                    removeEmptyCollections(newGameState);
+                    Gson gson = new GsonBuilder().create();
+                    String gameStateJson = gson.toJson(newGameState);
                     byte[] compressedData = Compress.compress(gameStateJson);
 
                     try {
@@ -211,35 +210,26 @@ public class World {
         this.tickTalkEvents.clear();
         this.tickTradeEvents.clear();
         this.tickSoundEvents.clear();
-        this.tickMagicEvents.clear();
     }
 
-    private <T extends Chunkable> List<T> getEntitiesInCurrentAndNeighborChunks(Player player, List<T> entities,
-            int[] neighborChunks) {
-        return entities.stream()
-                .filter(e -> e.getCurrentChunk() == player.currentChunk
-                        || Arrays.stream(neighborChunks).anyMatch(chunk -> chunk == e.getCurrentChunk()))
-                .collect(Collectors.toList());
-    }
+    private void removeEmptyCollections(GameState state) {
+        if (state.getTickAttackEvents().isEmpty())
+            state.setTickAttackEvents(null);
+        if (state.getTickTalkEvents().isEmpty())
+            state.setTickTalkEvents(null);
+        if (state.getTickTradeEvents().isEmpty())
+            state.setTickTradeEvents(null);
+        if (state.getTickSoundEvents().isEmpty())
+            state.setTickSoundEvents(null);
 
-    private GameState getChangedGameState() {
-        List<DTOPlayer> dtoPlayers = this.players.stream().map(player -> new DTOPlayer(player)).toList();
-        List<DTONpc> dtoNpcs = this.npcs.stream().map(npc -> new DTONpc(npc)).toList();
-
-        GameState newGameState = new GameState(this.tickAttackEvents, this.tickTalkEvents, this.tickTradeEvents,
-                this.tickSoundEvents,
-                this.tickMagicEvents,
-                dtoPlayers, dtoNpcs,
-                this.chatMessages,
-                this.items, null, this.onlinePlayers, this.shopsManager.getShops());
-        if (previousGameState == null) {
-            previousGameState = newGameState;
-            return newGameState;
-        } else {
-            GameState changedGameState = GameStateComparator.getChangedGameState(previousGameState, newGameState);
-            previousGameState = newGameState;
-            return changedGameState;
-        }
+        if (state.getPlayers().isEmpty())
+            state.setPlayers(null);
+        if (state.getNpcs().isEmpty())
+            state.setNpcs(null);
+        if (state.getItems().isEmpty())
+            state.setItems(null);
+        if (state.getChatMessages().isEmpty())
+            state.setChatMessages(null);
 
     }
 
@@ -323,24 +313,44 @@ public class World {
     }
 
     private void setInitialNpcs() {
-        addNpc(NpcConstants.MAN, 5, 17, 7);
-        addNpc(NpcConstants.MAN, 5, 17, 7);
-        addNpc(NpcConstants.MAN, 5, 17, 7);
+        for (int i = 0; i < 3; i++) {
+            addNpc(NpcConstants.MAN, 5, 17, 7);
+        }
     }
 
     private void addNpc(int index, int x, int y, int wanderRange) {
-        EntityData entityData = entitiesManager.getEntityDataByIndex(index);
-        Npc npc = new Npc(this, index, x, y, entityData.getName(),
-                entityData.getExamine(),
-                entityData.getRespawnTime(),
-                entityData.getSkills(),
-                entityData.getType());
+        Npc npc = new Npc(this, index, x, y);
         this.npcs.add(npc);
         npc.setWanderRange(wanderRange);
     }
 
     private void setInitialItems() {
-        this.itemsManager.spawnItem(50, 50, 64);
+        this.itemsManager.spawnItem(0, 0, 100);
+        this.itemsManager.spawnItem(1, 1, 101);
+    }
+
+    public void setItems(List<Item> items) {
+        this.items = items;
+    }
+
+    public List<Action> getActionQueue() {
+        return actionQueue;
+    }
+
+    public List<TalkEvent> getTickTalkEvents() {
+        return tickTalkEvents;
+    }
+
+    public List<TradeEvent> getTickTradeEvents() {
+        return tickTradeEvents;
+    }
+
+    public List<SoundEvent> getTickSoundEvents() {
+        return tickSoundEvents;
+    }
+
+    public void setTickSoundEvents(List<SoundEvent> tickSoundEvents) {
+        this.tickSoundEvents = tickSoundEvents;
     }
 
 }

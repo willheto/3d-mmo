@@ -1,22 +1,21 @@
 package com.g8e.updateserver;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonSyntaxException;
-
-import com.g8e.updateserver.AssetLoader.Asset;
-import com.g8e.updateserver.models.UpdateRequest;
-import com.g8e.updateserver.models.UpdateResponse;
-import com.g8e.updateserver.util.UpdateConstants;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.URISyntaxException;
+import java.util.List;
 
 import org.java_websocket.WebSocket;
 import org.java_websocket.handshake.ClientHandshake;
 import org.java_websocket.server.WebSocketServer;
 
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.URISyntaxException;
-import java.util.List;
+import com.g8e.updateserver.AssetLoader.Asset;
+import com.g8e.updateserver.models.UpdateRequest;
+import com.g8e.updateserver.models.UpdateResponse;
+import com.g8e.updateserver.util.UpdateConstants;
 import com.g8e.util.Logger;
+import com.google.gson.Gson;
+import com.google.gson.JsonSyntaxException;
 
 public class UpdateServer extends WebSocketServer {
 
@@ -76,7 +75,6 @@ public class UpdateServer extends WebSocketServer {
     @Override
     public void onError(WebSocket conn, Exception ex) {
         Logger.printError("An error occurred: " + ex.getMessage());
-        ex.printStackTrace(); // This will print the full stack trace
     }
 
     @Override

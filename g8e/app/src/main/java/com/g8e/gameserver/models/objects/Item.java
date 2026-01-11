@@ -3,26 +3,36 @@ package com.g8e.gameserver.models.objects;
 public class Item {
     private String uniqueID;
     private int itemID;
-    private String name;
-    private String examine;
-    private boolean isWieldable;
-    private String spriteName;
-    private int value;
-    private boolean isStackable;
     private int amount;
     private Integer worldX = null;
     private Integer worldY = null;
 
-    public Item(int itemID, String name, String examine, boolean isWieldable, boolean isStackable, String spriteName,
-            int value) {
+    private transient String name;
+    private transient String examine;
+    private transient boolean isWieldable;
+    final private transient int value;
+    private transient boolean isStackable;
+
+    public int uniqueIDChanged = 1;
+    public int itemIDChanged = 1;
+    public int amountChanged = 1;
+    public int worldXChanged = 1;
+    public int worldYChanged = 1;
+
+    public Item(int itemID, boolean isWieldable, boolean isStackable, int value) {
         this.itemID = itemID;
-        this.name = name;
-        this.examine = examine;
         this.isWieldable = isWieldable;
         this.isStackable = isStackable;
-        this.spriteName = spriteName;
         this.value = value;
         this.amount = 1;
+    }
+
+    public void clearChangedFlags() {
+        uniqueIDChanged = 0;
+        itemIDChanged = 0;
+        amountChanged = 0;
+        worldXChanged = 0;
+        worldYChanged = 0;
     }
 
     public int getValue() {
@@ -35,6 +45,7 @@ public class Item {
 
     public void setAmount(int amount) {
         this.amount = amount;
+        this.amountChanged = 1;
     }
 
     public boolean isStackable() {
@@ -77,14 +88,6 @@ public class Item {
         isWieldable = wieldable;
     }
 
-    public String getSpriteName() {
-        return spriteName;
-    }
-
-    public void setSpriteName(String spriteName) {
-        this.spriteName = spriteName;
-    }
-
     public String getUniqueID() {
         return uniqueID;
     }
@@ -99,6 +102,8 @@ public class Item {
 
     public void setWorldX(Integer worldX) {
         this.worldX = worldX;
+        this.worldXChanged = 1;
+
     }
 
     public Integer getWorldY() {
@@ -107,6 +112,7 @@ public class Item {
 
     public void setWorldY(Integer worldY) {
         this.worldY = worldY;
+        this.worldYChanged = 1;
     }
 
 }

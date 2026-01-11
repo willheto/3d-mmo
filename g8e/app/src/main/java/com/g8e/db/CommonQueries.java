@@ -37,13 +37,6 @@ public class CommonQueries {
                 // Use getObject to properly handle null values
                 Integer weapon = (Integer) rs.getObject("weapon");
                 Integer shield = (Integer) rs.getObject("shield");
-                Integer helmet = (Integer) rs.getObject("helmet");
-                Integer bodyArmor = (Integer) rs.getObject("body_armor");
-                Integer legArmor = (Integer) rs.getObject("leg_armor");
-                Integer gloves = (Integer) rs.getObject("gloves");
-                Integer boots = (Integer) rs.getObject("boots");
-                Integer neckwear = (Integer) rs.getObject("neckwear");
-                Integer ring = (Integer) rs.getObject("ring");
 
                 return new DBPlayer(
                         rs.getInt("player_id"),
@@ -56,21 +49,13 @@ public class CommonQueries {
                         rs.getInt("world_y"),
                         weapon, // weapon will remain null if the database value is null
                         shield,
-                        helmet,
-                        bodyArmor,
-                        legArmor,
-                        gloves,
-                        boots,
-                        neckwear,
-                        ring,
                         parseIntArray(rs.getString("inventory")),
                         parseIntArray(rs.getString("inventoryAmounts")),
                         parseIntArray(rs.getString("quest_progress")),
                         rs.getInt("attack_experience"),
                         rs.getInt("strength_experience"),
                         rs.getInt("defence_experience"),
-                        rs.getInt("hitpoints_experience"),
-                        rs.getInt("magic_experience"));
+                        rs.getInt("hitpoints_experience"));
             }
             return null;
         }
@@ -125,10 +110,9 @@ public class CommonQueries {
         }
     }
 
-    public static void savePlayerWieldablesByAccountId(int accountId, Integer weaponID, Integer shieldID,
-            Integer helmetID, Integer bodyArmorID, Integer legArmorID, Integer glovesID, Integer bootsID,
-            Integer neckwearID, Integer ringID) throws SQLException {
-        String query = "UPDATE players SET weapon = ?, shield = ?, helmet = ?, body_armor = ?, leg_armor = ?, gloves = ?, boots = ?, neckwear = ?, ring = ? WHERE account_id = ?";
+    public static void savePlayerWieldablesByAccountId(int accountId, Integer weaponID, Integer shieldID)
+            throws SQLException {
+        String query = "UPDATE players SET weapon = ?, shield = ? WHERE account_id = ?";
         try (Connection conn = Database.getConnection();
                 PreparedStatement stmt = conn.prepareStatement(query)) {
 
@@ -144,50 +128,8 @@ public class CommonQueries {
                 stmt.setNull(2, java.sql.Types.INTEGER);
             }
 
-            if (helmetID != null) {
-                stmt.setInt(3, helmetID);
-            } else {
-                stmt.setNull(3, java.sql.Types.INTEGER);
-            }
-
-            if (bodyArmorID != null) {
-                stmt.setInt(4, bodyArmorID);
-            } else {
-                stmt.setNull(4, java.sql.Types.INTEGER);
-            }
-
-            if (legArmorID != null) {
-                stmt.setInt(5, legArmorID);
-            } else {
-                stmt.setNull(5, java.sql.Types.INTEGER);
-            }
-
-            if (glovesID != null) {
-                stmt.setInt(6, glovesID);
-            } else {
-                stmt.setNull(6, java.sql.Types.INTEGER);
-            }
-
-            if (bootsID != null) {
-                stmt.setInt(7, bootsID);
-            } else {
-                stmt.setNull(7, java.sql.Types.INTEGER);
-            }
-
-            if (neckwearID != null) {
-                stmt.setInt(8, neckwearID);
-            } else {
-                stmt.setNull(8, java.sql.Types.INTEGER);
-            }
-
-            if (ringID != null) {
-                stmt.setInt(9, ringID);
-            } else {
-                stmt.setNull(9, java.sql.Types.INTEGER);
-            }
-
             // Account ID is the last parameter (10th)
-            stmt.setInt(10, accountId);
+            stmt.setInt(3, accountId);
 
             stmt.executeUpdate();
         }

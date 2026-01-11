@@ -10,36 +10,60 @@ import Draw2D from '../graphics/Draw2D';
 import { canvas, canvas2d } from '../graphics/2DCanvas';
 import Chat from './Chat';
 import EntitiesManager from '../managers/EntitiesManager';
+import { Hud } from './Hud';
+import ItemsManager from '../managers/ItemsManager';
+import { ItemPreviewRenderer } from '../graphics/ItemPreviewRenderer';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 
 export class World {
+	public gameSocket: WebSocket | null = null;
+	public client: Client;
+
 	public modalObject: ModalObject | null = null;
 	public canvas: HTMLCanvasElement;
+	public chat: Chat = new Chat(this);
+	public hud: Hud = new Hud(this);
 
 	// 3D RENDERING
 	public renderer: THREE.WebGLRenderer;
 	public scene: THREE.Scene;
+	public itemPreviewRenderer!: ItemPreviewRenderer;
+	private gltfLoader!: GLTFLoader;
+
+	// --- Camera ---
+	private readonly CAM_ROT_SPEED = 1.6;
+	private readonly MIN_PITCH = 0.35;
+	private readonly MAX_PITCH = 1.25;
+	public camera: THREE.PerspectiveCamera;
+	private camYaw = Math.PI / 4;
+	private camPitch = 0.8;
+	private camDistance = 14;
 
 	private inputTracker: InputTracker;
-	public groundGroups: THREE.Group[] = [];
 
-	public eventListenersManager: EventListenersManager = new EventListenersManager();
-	public chat: Chat = new Chat(this);
+	public groundGroups: THREE.Group[] = [];
+	public groundGroup = new THREE.Group();
+	private groundItemIcons = new Map<string, HTMLCanvasElement>();
 
 	public mouseDown: boolean;
+	public mouseButton: number;
 	public mouseScreenX: number;
 	public mouseScreenY: number;
 	public mouseTileX: number;
 	public mouseTileY: number;
 
-	public gameSocket: WebSocket | null = null;
-	public client: Client;
 	public currentPlayerID: string = '';
+
+	public modalJustClosed: boolean = false;
+
+	public chatMessages: SocketChatMessage[] = [];
 	public players: Player[] = [];
 	public npcs: Npc[] = [];
 	public items: SocketItem[] = [];
-	public modalJustClosed: boolean = false;
-	public chatMessages: SocketChatMessage[] = [];
+	public currentPlayer: Player | null = null;
 
+	public eventListenersManager: EventListenersManager = new EventListenersManager();
+	public itemsManager: ItemsManager = new ItemsManager();
 	public entitiesManager: EntitiesManager = new EntitiesManager();
 	public tileManager: TileManager = new TileManager(this);
 
@@ -53,18 +77,8 @@ export class World {
 	private running = false;
 	private isLoading = false;
 
-	// --- Camera ---
-	private readonly CAM_ROT_SPEED = 1.6;
-	private readonly MIN_PITCH = 0.35;
-	private readonly MAX_PITCH = 1.25;
-	public camera: THREE.PerspectiveCamera;
-	private camYaw = Math.PI / 4;
-	private camPitch = 0.8;
-	private camDistance = 14;
-
 	// --- World ---
 	public readonly TILE_SIZE = 1;
-	public groundGroup = new THREE.Group();
 
 	// --- Marker ---
 	public marker: THREE.Mesh;
@@ -85,6 +99,7 @@ export class World {
 	constructor(client: Client) {
 		this.client = client;
 		this.mouseDown = false;
+		this.mouseButton = -1;
 		this.mouseScreenX = 0;
 		this.mouseScreenY = 0;
 		this.mouseTileX = 0;
@@ -95,7 +110,23 @@ export class World {
 		this.renderer = new THREE.WebGLRenderer({
 			canvas: canvas,
 			antialias: true,
+			alpha: true,
 		});
+
+		this.gltfLoader = new GLTFLoader();
+
+		this.itemPreviewRenderer = new ItemPreviewRenderer({
+			renderer: this.renderer,
+			gltfLoader: this.gltfLoader,
+			size: 85,
+		});
+
+		// Color management (required for correct Blender/BaseColor look)
+		this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+		// Optional but recommended
+		this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+		this.renderer.toneMappingExposure = 1.0;
 
 		this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 		this.renderer.setSize(window.innerWidth, window.innerHeight);
@@ -158,7 +189,7 @@ export class World {
 		ctx.fillRect(((width / 2) | 0) - 150, y + 2, progress * 3, 30);
 
 		// text
-		ctx.font = '14px Pkmn';
+		ctx.font = '18px Pkmn';
 		ctx.textAlign = 'center';
 		ctx.fillStyle = 'white';
 		ctx.fillText(message, width / 2, y + 22);
@@ -177,6 +208,7 @@ export class World {
 
 		document.addEventListener('pointerdown', e => {
 			this.mouseDown = true;
+			this.mouseButton = e.button; // 0 = left, 2 = right
 			this.mouseScreenX = e.clientX;
 			this.mouseScreenY = e.clientY;
 		});
@@ -194,7 +226,6 @@ export class World {
 			e.preventDefault();
 		});
 		this.renderer.domElement.addEventListener('pointerdown', this.onPointerDown);
-
 		this.client.audioManager.playMusic('baroque.ogg');
 	}
 
@@ -238,20 +269,102 @@ export class World {
 		return marker;
 	}
 
-	// world.ts
+	private worldToScreen(pos: THREE.Vector3) {
+		const v = pos.clone().project(this.camera);
+
+		if (v.z < -1 || v.z > 1) return null;
+
+		const width = this.renderer.domElement.width;
+		const height = this.renderer.domElement.height;
+
+		return {
+			x: (v.x * 0.5 + 0.5) * width,
+			y: (-v.y * 0.5 + 0.5) * height,
+		};
+	}
+
+	private drawGroundItems(): void {
+		const ctx = canvas2d;
+
+		for (const item of this.items) {
+			if (item.worldX == null || item.worldY == null) continue;
+
+			const itemData = this.itemsManager.getItemInfoById(item.itemID);
+			if (!itemData) continue;
+
+			// World position (slightly above ground)
+			const worldPos = new THREE.Vector3(item.worldX, 0.15, item.worldY);
+
+			const screen = this.worldToScreen(worldPos);
+			if (!screen) continue;
+
+			const iconKey = itemData.modelName;
+
+			if (!this.groundItemIcons.has(iconKey)) {
+				this.itemPreviewRenderer.getIcon(iconKey).then(icon => {
+					this.groundItemIcons.set(iconKey, icon);
+				});
+				continue;
+			}
+
+			const icon = this.groundItemIcons.get(iconKey)!;
+
+			const x = screen.x - 20;
+			const y = screen.y - 80;
+			ctx.drawImage(icon, x, y);
+		}
+	}
+
 	update(dt: number) {
 		canvas2d.clearRect(0, 0, canvas.width, canvas.height);
 
 		this.updatePlayers(dt);
 		this.updateCamera(dt);
+		this.camera.updateMatrixWorld(true);
+		this.camera.updateProjectionMatrix();
 
 		if (this.isLoading) {
 			return;
 		}
 
+		this.drawGroundItems();
 		this.chat.drawChat();
+		this.hud.drawHud();
+
 		Draw2D.drawModal(this);
 		this.playSoundEvents();
+		this.drawDebug(this.client.renderFps);
+	}
+
+	private drawDebug(fps: number): void {
+		canvas2d.textBaseline = 'middle';
+
+		canvas2d.fillStyle = 'rgba(0, 0, 0, 0.5)';
+		canvas2d.fillRect(0, 0, 350, 205);
+
+		canvas2d.font = '18px Pkmn';
+		canvas2d.fillStyle = 'white';
+		canvas2d.fillText('FPS: ' + fps, 10, 25);
+		canvas2d.fillText('Latency: ', 10, 45);
+		const latencyTextWidth = canvas2d.measureText('Latency: ').width;
+		if (this.client?.latency <= 250) {
+			canvas2d.fillStyle = 'yellow';
+		} else {
+			canvas2d.fillStyle = 'red';
+		}
+
+		canvas2d.fillText(Math.floor(this.client.latency || 0) + 'ms', 10 + latencyTextWidth, 45);
+		canvas2d.fillStyle = 'white';
+		canvas2d.fillText('Last packet size: ' + Math.floor(this.client?.lastPacketSize || 0) + ' bytes', 10, 65);
+		const currentPlayer = this.players.find(player => player.entityID === this.currentPlayerID);
+		canvas2d.fillText('Player tile: ' + currentPlayer?.worldX + ', ' + currentPlayer?.worldY, 10, 85);
+		canvas2d.fillText('Mouse tile: ' + this.mouseTileX + ', ' + this.mouseTileY, 10, 105);
+		canvas2d.fillText('Mouse screen: ' + this.mouseScreenX + ', ' + this.mouseScreenY, 10, 125);
+
+		canvas2d.fillText('Current chunk: ' + currentPlayer?.currentChunk, 10, 165);
+
+		canvas2d.fillStyle = 'yellow';
+		canvas2d.fillText('Type ::debug to hide', 10, 195);
 	}
 
 	private playSoundEvents(): void {
@@ -277,9 +390,7 @@ export class World {
 
 	updateCamera(dt: number) {
 		if (this.inputTracker.keys['arrowleft']) this.camYaw -= this.CAM_ROT_SPEED * dt;
-
 		if (this.inputTracker.keys['arrowright']) this.camYaw += this.CAM_ROT_SPEED * dt;
-
 		if (this.inputTracker.keys['arrowup']) this.camPitch += (this.CAM_ROT_SPEED - 0.6) * dt;
 		if (this.inputTracker.keys['arrowdown']) this.camPitch -= (this.CAM_ROT_SPEED - 0.6) * dt;
 
@@ -293,18 +404,15 @@ export class World {
 		}
 
 		const target = currentPlayer?.model.position;
-
 		const x = target.x + Math.sin(this.camYaw) * Math.cos(this.camPitch) * this.camDistance;
-
 		const y = target.y + Math.sin(this.camPitch) * this.camDistance;
-
 		const z = target.z + Math.cos(this.camYaw) * Math.cos(this.camPitch) * this.camDistance;
 
 		this.camera.position.set(x, y, z);
 		this.camera.lookAt(target);
 	}
 
-	updatePlayers(dt: number) {
+	private updatePlayers(dt: number): void {
 		this.players.forEach(player => {
 			player.drawPlayer(dt);
 		});
@@ -312,35 +420,106 @@ export class World {
 		this.npcs.forEach(npc => npc.drawNpc(dt));
 	}
 
+	private onGroundItemClick(item: SocketItem) {
+		if (this.modalJustClosed) return;
+
+		const itemData = this.itemsManager.getItemInfoById(item.itemID);
+		if (!itemData) return;
+
+		this.modalObject = {
+			modalX: this.mouseScreenX + 8,
+			modalY: this.mouseScreenY + 8,
+			modalOptions: [],
+		};
+
+		this.modalObject.modalOptions.push({
+			optionText: 'Take ',
+			optionSecondaryText: {
+				text: itemData.name,
+				color: '#ffff66',
+			},
+			optionFunction: () => {
+				this.actions?.takeGroundItem(this.currentPlayerID, item.uniqueID);
+				this.modalObject = null;
+			},
+		});
+
+		this.modalObject.modalOptions.push({
+			optionText: 'Examine ',
+			optionSecondaryText: {
+				text: itemData.name,
+				color: '#ffff66',
+			},
+			optionFunction: () => {
+				this.actions?.sendChatMessage(this.currentPlayerID, itemData.examine || 'Nothing interesting.', false);
+			},
+		});
+	}
+
+	private getItemAtTile(tx: number, ty: number): SocketItem | null {
+		for (const item of this.items) {
+			if (item.worldX === tx && item.worldY === ty) {
+				return item;
+			}
+		}
+		return null;
+	}
+
+	private updateMouseTileFromRay(raycaster: THREE.Raycaster): boolean {
+		const hits = raycaster.intersectObjects(
+			this.groundGroups.flatMap(g => g.children),
+			false,
+		);
+
+		if (!hits.length) return false;
+
+		const hit = hits[0].object;
+		this.mouseTileX = hit.userData.tx;
+		this.mouseTileY = hit.userData.tz;
+		return true;
+	}
+
 	private onPointerDown(e: PointerEvent) {
+		// Over UI
+		if (this.mouseScreenY > 520) {
+			return;
+		}
 		const currentPlayer = this.players.find(p => p.entityID === this.currentPlayerID);
 		if (!currentPlayer) return;
 
 		currentPlayer.mouseNdc.set((e.clientX / window.innerWidth) * 2 - 1, -(e.clientY / window.innerHeight) * 2 + 1);
-
 		currentPlayer.raycaster.setFromCamera(currentPlayer.mouseNdc, this.camera);
 
 		if (e.button === 2) {
 			const npcMeshes = this.npcs.flatMap(npc => {
 				const meshes: THREE.Mesh[] = [];
 				npc.model.traverse(obj => {
-					if (obj instanceof THREE.Mesh) {
-						meshes.push(obj);
-					}
+					if (obj instanceof THREE.Mesh) meshes.push(obj);
 				});
 				return meshes;
 			});
 
 			const npcHits = currentPlayer.raycaster.intersectObjects(npcMeshes, false);
-
 			if (npcHits.length) {
-				const hit = npcHits[0].object;
-
-				const npc = hit.userData.npc as Npc;
-
-				this.onNpcClick(npc);
+				const npc = npcHits[0].object.userData.npc as Npc;
+				npc.onClick();
 				return;
 			}
+
+			if (!this.updateMouseTileFromRay(currentPlayer.raycaster)) {
+				return;
+			}
+
+			const tx = this.mouseTileX;
+			const ty = this.mouseTileY;
+
+			const item = this.getItemAtTile(tx, ty);
+			if (item) {
+				this.onGroundItemClick(item);
+				return;
+			}
+
+			return;
 		} else {
 			const groundHits = currentPlayer.raycaster.intersectObjects(
 				this.groundGroups.flatMap(g => g.children),
@@ -359,62 +538,5 @@ export class World {
 			this.marker.position.set(tx, y + 0.02, tz);
 			this.marker.visible = true;
 		}
-	}
-
-	private onNpcClick(npc: Npc) {
-		// prevent immediate close
-		if (this.modalJustClosed) return;
-		canvas.style.pointerEvents = 'auto';
-
-		this.modalObject = {
-			modalX: this.mouseScreenX + 8,
-			modalY: this.mouseScreenY + 8,
-			modalOptions: [],
-		};
-
-		const npcData = this.entitiesManager.getEntityInfoByIndex(npc.entityIndex);
-		if (!npcData) {
-			this.actions?.sendChatMessage(this.currentPlayerID, 'No data', false);
-			return;
-		}
-
-		if (npcData?.isTalkable) {
-			this.modalObject.modalOptions.push({
-				optionText: 'Talk-to ',
-				optionSecondaryText: {
-					text: npcData.name,
-					color: '#ffff66',
-				},
-				optionFunction: () => {
-					this.actions?.moveAndTalk(this.currentPlayerID, npc.entityID);
-					this.modalObject = null;
-				},
-			});
-		}
-
-		if (npcData?.type === 2) {
-			this.modalObject.modalOptions.push({
-				optionText: 'Attack ',
-				optionSecondaryText: {
-					text: npcData.name,
-					color: '#ffff66',
-				},
-				optionFunction: () => {
-					this.actions?.moveAndAttack(this.currentPlayerID, npc.entityID);
-					this.modalObject = null;
-				},
-			});
-		}
-
-		this.modalObject.modalOptions.push({
-			optionText: 'Examine ',
-			optionSecondaryText: {
-				text: npcData.name,
-				color: '#66ff66',
-			},
-			optionFunction: () => {
-				this.actions?.sendChatMessage(this.currentPlayerID, npcData?.examine || 'No data', false);
-			},
-		});
 	}
 }

@@ -3,7 +3,7 @@ package com.g8e.gameserver.network.actions.wield;
 import com.g8e.gameserver.network.actions.Action;
 
 public class WieldItemAction extends Action {
-    private WieldItemActionData data;
+    final private WieldItemActionData data;
 
     public WieldItemAction(String playerID, WieldItemActionData data) {
         this.action = "wieldItem";

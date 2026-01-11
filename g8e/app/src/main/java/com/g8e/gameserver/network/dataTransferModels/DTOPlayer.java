@@ -2,153 +2,171 @@ package com.g8e.gameserver.network.dataTransferModels;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.Objects;
 
 import com.g8e.gameserver.enums.Direction;
-import com.g8e.gameserver.models.Chunkable;
 import com.g8e.gameserver.models.entities.Player;
-import com.g8e.gameserver.models.spells.Spell;
 import com.g8e.gameserver.pathfinding.PathNode;
 
-public class DTOPlayer implements Chunkable {
+public class DTOPlayer {
     // Player fields
     public int[] inventory;
     public int[] inventoryAmounts;
     public int[] questProgress;
-    public int influence;
-    public int skinColor;
-    public int hairColor;
-    public int shirtColor;
-    public int pantsColor;
-    public int teleportCounter;
-    public int spellCounter;
-    public String spellTarget;
-    public Spell spellUsed;
+    public Integer influence;
+    public Integer skinColor;
+    public Integer hairColor;
+    public Integer shirtColor;
+    public Integer pantsColor;
+    public String username;
 
     // Combatant fields
     public int[] skills;
-    public int currentHitpoints;
-    public boolean isInCombat;
-
-    public int combatLevel;
-    public Integer weapon = null;
-    public Integer helmet = null;
-    public Integer shield = null;
-    public Integer bodyArmor = null;
-    public Integer legArmor = null;
-    public Integer gloves = null;
-    public Integer boots = null;
-    public Integer neckwear = null;
-    public Integer ring = null;
-
+    public Integer currentHitpoints;
+    public Boolean isInCombat;
+    public Integer weapon;
+    public Integer shield;
     public String attackStyle;
-    public boolean isDying = false;
-    public Integer lastDamageDealt = null;
+    public Integer lastDamageDealt;
 
     // Entity fields
     public String entityID;
-    public int entityIndex;
-    public int worldX;
-    public int worldY;
-    public Direction nextTileDirection = null;
-    public Direction facingDirection = Direction.DOWN;
-    public String name;
-    public int currentChunk;
+    public Integer worldX;
+    public Integer worldY;
+    public Direction nextTileDirection;
+    public Direction facingDirection;
     public List<PathNode> currentPath;
+    public Boolean isDying;
 
     public DTOPlayer(Player player) {
-        this.inventory = player.inventory;
-        this.inventoryAmounts = player.inventoryAmounts;
-        this.questProgress = player.questProgress;
+        this.entityID = player.entityID;
+
+        if (player.inventoryChanged == 1) {
+            this.inventory = Arrays.copyOf(player.inventory, player.inventory.length);
+        }
+        if (player.inventoryAmountsChanged == 1) {
+            this.inventoryAmounts = Arrays.copyOf(player.inventoryAmounts, player.inventoryAmounts.length);
+        }
+        if (player.questProgressChanged == 1) {
+            this.questProgress = Arrays.copyOf(player.questProgress, player.questProgress.length);
+        }
+        if (player.skillsChanged == 1) {
+            this.skills = Arrays.copyOf(player.skills, player.skills.length);
+        }
+        if (player.influenceChanged == 1) {
+            this.influence = player.influence;
+        }
+
+        if (player.skinColorChanged == 1)
+            this.skinColor = player.skinColor;
+        if (player.hairColorChanged == 1)
+            this.hairColor = player.hairColor;
+        if (player.shirtColorChanged == 1)
+            this.shirtColor = player.shirtColor;
+        if (player.pantsColorChanged == 1)
+            this.pantsColor = player.pantsColor;
+
+        if (player.currentHitpointsChanged == 1) {
+            this.currentHitpoints = player.currentHitpoints;
+        }
+
+        if (player.isInCombatChanged == 1) {
+            this.isInCombat = player.isInCombat;
+        }
+
+        if (player.weaponChanged == 1)
+            this.weapon = player.weapon;
+        if (player.shieldChanged == 1)
+            this.shield = player.shield;
+
+        if (player.attackStyleChanged == 1) {
+            this.attackStyle = player.attackStyle;
+        }
+
+        if (player.isDyingChanged == 1) {
+            this.isDying = player.isDying;
+        }
+
+        if (player.lastDamageDealtChanged == 1) {
+            this.lastDamageDealt = player.lastDamageDealt;
+        }
+
+        if (player.worldXChanged == 1)
+            this.worldX = player.worldX;
+        if (player.worldYChanged == 1)
+            this.worldY = player.worldY;
+
+        if (player.nextTileDirectionChanged == 1) {
+            this.nextTileDirection = player.nextTileDirection;
+        }
+
+        if (player.facingDirectionChanged == 1) {
+            this.facingDirection = player.facingDirection;
+        }
+
+        if (player.currentPathChanged == 1) {
+            this.currentPath = player.currentPath == null
+                    ? null
+                    : List.copyOf(player.currentPath);
+        }
+
+        if (player.usernameChanged == 1) {
+            this.username = player.username;
+        }
+    }
+
+    public DTOPlayer(Player player, boolean includeEverything) {
+        this.entityID = player.entityID;
+        this.inventory = Arrays.copyOf(player.inventory, player.inventory.length);
+        this.inventoryAmounts = Arrays.copyOf(player.inventoryAmounts, player.inventoryAmounts.length);
+        this.questProgress = Arrays.copyOf(player.questProgress, player.questProgress.length);
+        this.skills = Arrays.copyOf(player.skills, player.skills.length);
         this.influence = player.influence;
         this.skinColor = player.skinColor;
         this.hairColor = player.hairColor;
         this.shirtColor = player.shirtColor;
         this.pantsColor = player.pantsColor;
-        this.teleportCounter = player.teleportCounter;
-        this.spellCounter = player.spellCounter;
-        this.spellTarget = player.spellTarget;
-        this.spellUsed = player.spellUsed;
-
-        this.skills = player.skills;
         this.currentHitpoints = player.currentHitpoints;
         this.isInCombat = player.isInCombat;
-
-        this.combatLevel = player.combatLevel;
         this.weapon = player.weapon;
-        this.helmet = player.helmet;
         this.shield = player.shield;
-        this.bodyArmor = player.bodyArmor;
-        this.legArmor = player.legArmor;
-        this.gloves = player.gloves;
-        this.boots = player.boots;
-        this.neckwear = player.neckwear;
-        this.ring = player.ring;
         this.attackStyle = player.attackStyle;
         this.isDying = player.isDying;
         this.lastDamageDealt = player.lastDamageDealt;
-
-        this.entityID = player.entityID;
-        this.entityIndex = player.entityIndex;
         this.worldX = player.worldX;
         this.worldY = player.worldY;
         this.nextTileDirection = player.nextTileDirection;
         this.facingDirection = player.facingDirection;
-        this.name = player.name;
-        this.currentChunk = player.currentChunk;
-        this.currentPath = player.currentPath;
+        this.currentPath = player.currentPath == null
+                ? null
+                : List.copyOf(player.currentPath);
+        this.username = player.username;
 
     }
 
-    @Override
-    public int getCurrentChunk() {
-        return this.currentChunk;
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        if (this == obj)
-            return true;
-        if (obj == null || getClass() != obj.getClass())
-            return false;
-
-        DTOPlayer other = (DTOPlayer) obj;
-
-        return Arrays.hashCode(this.inventory) == Arrays.hashCode(other.inventory) &&
-                Arrays.hashCode(this.inventoryAmounts) == Arrays.hashCode(other.inventoryAmounts) &&
-                Arrays.hashCode(this.questProgress) == Arrays.hashCode(other.questProgress) &&
-                Arrays.hashCode(this.skills) == Arrays.hashCode(other.skills) &&
-                this.influence == other.influence &&
-                this.skinColor == other.skinColor &&
-                this.hairColor == other.hairColor &&
-                this.shirtColor == other.shirtColor &&
-                this.pantsColor == other.pantsColor &&
-                this.currentHitpoints == other.currentHitpoints &&
-                this.isInCombat == other.isInCombat &&
-                this.combatLevel == other.combatLevel &&
-                Objects.equals(this.weapon, other.weapon) &&
-                Objects.equals(this.helmet, other.helmet) &&
-                Objects.equals(this.shield, other.shield) &&
-                Objects.equals(this.bodyArmor, other.bodyArmor) &&
-                Objects.equals(this.legArmor, other.legArmor) &&
-                Objects.equals(this.gloves, other.gloves) &&
-                Objects.equals(this.boots, other.boots) &&
-                Objects.equals(this.neckwear, other.neckwear) &&
-                Objects.equals(this.ring, other.ring) &&
-                Objects.equals(this.attackStyle, other.attackStyle) &&
-                this.isDying == other.isDying &&
-                Objects.equals(this.entityID, other.entityID) &&
-                this.entityIndex == other.entityIndex &&
-                this.worldX == other.worldX &&
-                this.worldY == other.worldY &&
-                Objects.equals(this.nextTileDirection, other.nextTileDirection) &&
-                Objects.equals(this.facingDirection, other.facingDirection) &&
-                Objects.equals(this.name, other.name) &&
-                this.currentChunk == other.currentChunk &&
-                this.teleportCounter == other.teleportCounter &&
-                this.spellCounter == other.spellCounter &&
-                Objects.equals(this.spellTarget, other.spellTarget) &&
-                Objects.equals(this.spellUsed, other.spellUsed);
+    public boolean hasOnlyEntityId() {
+        return entityID != null
+                && inventory == null
+                && inventoryAmounts == null
+                && questProgress == null
+                && skills == null
+                && influence == null
+                && skinColor == null
+                && hairColor == null
+                && shirtColor == null
+                && pantsColor == null
+                && username == null
+                && currentHitpoints == null
+                && isInCombat == null
+                && weapon == null
+                && shield == null
+                && attackStyle == null
+                && lastDamageDealt == null
+                && worldX == null
+                && worldY == null
+                && nextTileDirection == null
+                && facingDirection == null
+                && currentPath == null
+                && isDying == null;
     }
 
     public String getEntityID() {

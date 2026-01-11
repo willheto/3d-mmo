@@ -60,20 +60,34 @@ export default class Chat {
 		});
 	}
 
-	
-
 	public drawChat(): void {
 		if (this.talkModal) {
 			this.drawTalkModal(this.talkModal);
 			return;
 		}
 
-		canvas2d.fillStyle = 'rgba(22, 22, 22, 0.5)';
+		canvas2d.textBaseline = 'middle';
+		canvas2d.fillStyle = '#6E5235';
 		canvas2d.fillRect(5, canvas.height - 140 - 5, this.chatWidth, this.chatHeight);
+
+		// Chat background
+		canvas2d.fillStyle = '#6E5235';
+		canvas2d.fillRect(5, canvas.height - 140 - 5, this.chatWidth, this.chatHeight);
+
+		// Dark outer border
+		canvas2d.strokeStyle = '#000000';
+		canvas2d.lineWidth = 2;
+		canvas2d.strokeRect(5, canvas.height - 140 - 5, this.chatWidth, this.chatHeight);
+
+		// Optional inner highlight border (subtle depth)
+		canvas2d.strokeStyle = 'rgba(255,255,255,0.2)';
+		canvas2d.lineWidth = 1;
+		canvas2d.strokeRect(6, canvas.height - 140 - 4, this.chatWidth - 2, this.chatHeight - 2);
+
 		canvas2d.strokeStyle = 'white';
 
 		canvas2d.fillStyle = 'white';
-		canvas2d.font = '16px Pkmn';
+		canvas2d.font = '18px Pkmn';
 		canvas2d.textAlign = 'left';
 
 		this.world.chatMessages

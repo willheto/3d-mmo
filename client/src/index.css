@@ -4,7 +4,7 @@ body {
 
 @font-face {
 	font-family: 'Pkmn';
-	src: url('./assets/fonts/pkmn_font.ttf') format('truetype');
+	src: url('./assets/fonts/runescape.ttf') format('truetype');
 }
 
 canvas {

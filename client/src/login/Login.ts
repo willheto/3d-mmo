@@ -95,13 +95,13 @@ export default class Login {
 		if (this.currentlyActiveScreen === 'title') {
 			Draw2D.drawText(canvas.width / 2, canvas.height / 2 - 120, '3d game Online', {
 				color: 'yellow',
-				font: 'bold 14px Pkmn, sans-serif',
+				font: 'bold 18px Pkmn, sans-serif',
 				align: 'center',
 			});
 
 			Draw2D.drawText(canvas.width / 2, canvas.height / 2 - 80, 'Login', {
 				color: 'white',
-				font: 'bold 14px Pkmn, sans-serif',
+				font: 'bold 18px Pkmn, sans-serif',
 				align: 'center',
 			});
 
@@ -112,7 +112,7 @@ export default class Login {
 		} else if (this.currentlyActiveScreen === 'login') {
 			Draw2D.drawText(canvas.width / 2, canvas.height / 2 - 150, this.loginText, {
 				color: 'yellow',
-				font: 'bold 13px Pkmn, sans-serif',
+				font: 'bold 16px Pkmn, sans-serif',
 				align: 'center',
 			});
 
@@ -127,7 +127,7 @@ export default class Login {
 					(drawIndicator && this.currentInput === 'username' ? this.indicator : ''),
 				{
 					color: 'white',
-					font: 'bold 13px Pkmn, sans-serif',
+					font: 'bold 16px Pkmn, sans-serif',
 				},
 			);
 
@@ -139,13 +139,13 @@ export default class Login {
 					(drawIndicator && this.currentInput === 'password' ? this.indicator : ''),
 				{
 					color: 'white',
-					font: 'bold 13px Pkmn, sans-serif',
+					font: 'bold 16px Pkmn, sans-serif',
 				},
 			);
 
 			Draw2D.drawText(canvas.width / 2 - 77, canvas.height / 2 - 45, 'Login', {
 				color: 'white',
-				font: 'bold 13px Pkmn, sans-serif',
+				font: 'bold 16px Pkmn, sans-serif',
 				align: 'center',
 			});
 
@@ -156,7 +156,7 @@ export default class Login {
 
 			Draw2D.drawText(canvas.width / 2 + 85, canvas.height / 2 - 45, 'Cancel', {
 				color: 'white',
-				font: 'bold 13px Pkmn, sans-serif',
+				font: 'bold 16px Pkmn, sans-serif',
 				align: 'center',
 			});
 

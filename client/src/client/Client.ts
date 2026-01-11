@@ -19,11 +19,27 @@ const UPDATE_RESPONSE = {
 };
 
 export default class Client {
-	private targetFPS: number = 50;
-	private frameInterval: number = 1000 / this.targetFPS;
-	public lastFrameTime: number = performance.now();
-	private accumulator: number = 0;
-	public fps: number = 0;
+	// simulation
+	private targetFPS = 50;
+	private frameInterval = 1000 / this.targetFPS;
+	private accumulator = 0;
+	private lastFrameTime = performance.now();
+
+	// simulation FPS (UPS)
+	private simFrames = 0;
+	private simFpsTime = 0;
+	public fps = 0; // UPS
+
+	// rendering
+	private readonly renderInterval = 1000 / this.targetFPS;
+	private lastRenderTime = 0;
+
+	// render FPS
+	private renderFrames = 0;
+	private renderFpsTime = 0;
+	public renderFps = 0;
+
+	private animationFrame = 0;
 
 	private loginTime: number = Date.now();
 
@@ -39,8 +55,6 @@ export default class Client {
 	public cacheNumber: number | null = null;
 
 	private pingInterval: any;
-	private animationFrame: number = 0;
-
 	public audioManager: AudioManager = new AudioManager();
 
 	constructor() {
@@ -87,6 +101,8 @@ export default class Client {
 				Draw2D.fillCanvas('black');
 				Draw2D.showProgress(50, 'Unpacking assets');
 				await Cache.saveNewCache(data.assets, data.cacheNumber);
+				await Cache.preloadImages();
+
 				this.audioManager.loadMusicAreas();
 				this.cacheNumber = data.cacheNumber;
 			} else if (data.type === UPDATE_RESPONSE.CACHE_UP_TO_DATE) {
@@ -154,10 +170,10 @@ export default class Client {
 				const compressedData = new Uint8Array(arrayBuffer);
 				const decompressedData = pako.inflate(compressedData, { to: 'string' });
 				const gameData: SocketGameState = JSON.parse(decompressedData);
-
 				if (gameData.playerID) {
 					if (!this.world) return;
 					this.world.currentPlayerID = gameData.playerID;
+
 					this.updateGameState(gameData);
 					this.startGameLoop();
 					setTimeout(() => {
@@ -202,6 +218,8 @@ export default class Client {
 	private startGameLoop(): void {
 		if (!this.world) return;
 		this.animationFrame = requestAnimationFrame(this.gameLoop);
+		this.lastFrameTime = performance.now();
+		this.lastRenderTime = this.lastFrameTime;
 
 		this.pingInterval = setInterval(() => {
 			this.sendPing();
@@ -210,27 +228,59 @@ export default class Client {
 
 	private gameLoop = (now: number) => {
 		this.animationFrame = requestAnimationFrame(this.gameLoop);
-
 		if (!this.world) return;
 
-		let deltaTime = now - this.lastFrameTime;
+		// ----- time -----
+		const deltaTime = now - this.lastFrameTime;
 		this.lastFrameTime = now;
 
-		// HARD reset when backgrounded or stalled
+		// background / tab stall protection
 		if (deltaTime > 250) {
 			this.accumulator = 0;
 			return;
 		}
 
+		// ----- simulation -----
 		this.accumulator += deltaTime;
+		this.simFpsTime += deltaTime;
 
-		while (this.accumulator >= this.frameInterval) {
+		const MAX_UPDATES_PER_FRAME = 5;
+		let updates = 0;
+
+		while (this.accumulator >= this.frameInterval && updates < MAX_UPDATES_PER_FRAME) {
 			this.world.update(this.frameInterval / 1000);
 			this.accumulator -= this.frameInterval;
+			this.simFrames++;
+			updates++;
 		}
 
-		// Render exactly once per frame
-		this.world.render();
+		// drop excess time if overloaded
+		if (updates === MAX_UPDATES_PER_FRAME) {
+			this.accumulator = 0;
+		}
+
+		// UPS calculation
+		if (this.simFpsTime >= 1000) {
+			this.fps = this.simFrames; // TRUE world update FPS
+			this.simFrames = 0;
+			this.simFpsTime -= 1000;
+		}
+
+		// ----- rendering (CAPPED @ 60 FPS) -----
+		if (now - this.lastRenderTime >= this.renderInterval) {
+			this.world.render();
+
+			this.lastRenderTime += this.renderInterval;
+
+			this.renderFrames++;
+			this.renderFpsTime += this.renderInterval;
+
+			if (this.renderFpsTime >= 1000) {
+				this.renderFps = this.renderFrames;
+				this.renderFrames = 0;
+				this.renderFpsTime -= 1000;
+			}
+		}
 	};
 
 	private async connectToLoginServer(): Promise<void> {
@@ -255,13 +305,13 @@ export default class Client {
 
 		// remove players that are no longer online
 		this.world.players.forEach(player => {
-			if (onlinePlayers.includes(player.entityID) === false) {
+			if (onlinePlayers?.includes(player.entityID) === false) {
 				this.world?.scene.remove(player.model);
 			}
 		});
-		this.world.players = this.world.players.filter(player => onlinePlayers.includes(player.entityID));
+		this.world.players = this.world.players.filter(player => onlinePlayers?.includes(player.entityID));
 
-		players.forEach(player => {
+		players?.forEach(player => {
 			const matchingPlayer = this.world?.players.find(p => p.entityID === player.entityID);
 			if (!matchingPlayer) {
 				if (!this.world) return;
@@ -283,7 +333,7 @@ export default class Client {
 			npcMap.set(existingNpc.entityID, existingNpc);
 		});
 
-		npcs.forEach(npc => {
+		npcs?.forEach(npc => {
 			const matchingNpc = npcMap.get(npc.entityID);
 
 			if (matchingNpc) {
@@ -298,22 +348,27 @@ export default class Client {
 			}
 		});
 
-		this.world.chatMessages = chatMessages.filter(chatMessage => {
-			// time sent after login
-			if (chatMessage.timeSent < this.loginTime) {
-				return false;
-			}
+		this.world.chatMessages = [
+			...this.world.chatMessages,
+			...(chatMessages?.filter(chatMessage => {
+				// time sent after login
+				if (chatMessage.timeSent < this.loginTime) {
+					return false;
+				}
 
-			const currentPlayer = this.world?.players.find(player => player.entityID === this.world?.currentPlayerID);
+				const currentPlayer = this.world?.players.find(
+					player => player.entityID === this.world?.currentPlayerID,
+				);
 
-			if (chatMessage.senderName === currentPlayer?.name || chatMessage.isGlobal === true) {
-				return true;
-			}
-		});
+				if (chatMessage.senderName === currentPlayer?.name || chatMessage.isGlobal === true) {
+					return true;
+				}
+			}) || []),
+		];
 
-		this.world.attackEvents = gameData.tickAttackEvents;
-		this.world.soundEvents = gameData.tickSoundEvents;
-		this.world.talkEvents = gameData.tickTalkEvents;
-		this.world.items = gameData.items;
+		this.world.attackEvents = gameData.tickAttackEvents || [];
+		this.world.soundEvents = gameData.tickSoundEvents || [];
+		this.world.talkEvents = gameData.tickTalkEvents || [];
+		this.world.items = gameData.items || [];
 	}
 }

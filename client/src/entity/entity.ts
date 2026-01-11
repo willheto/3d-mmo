@@ -1,5 +1,8 @@
 import * as THREE from 'three';
 import { World } from '../world/World';
+import { ExperienceUtils } from '../util/ExperienceCurve';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
+import Cache from '../cache/index';
 
 export class Entity {
 	protected readonly MODEL_YAW_OFFSET = -Math.PI;
@@ -18,7 +21,7 @@ export class Entity {
 	protected hasDied: boolean = false;
 
 	protected world: World;
-	public nextTileDirection: Direction | null = null;
+	public nextTileDirection: Direction = 'NONE';
 	public entityID: string;
 	public worldX: number = 0;
 	public worldY: number = 0;
@@ -34,13 +37,28 @@ export class Entity {
 	public skills: number[] = [];
 	public examine: string = '';
 
+	public weapon: number = -1;
+	public helmet: number = -1;
+	public shield: number = -1;
+	public bodyArmor: number = -1;
+	public legArmor: number = -1;
+	public gloves: number = -1;
+	public boots: number = -1;
+	public neckwear: number = -1;
+	public ring: number = -1;
+	protected equippedWeapon: THREE.Object3D | null = null;
+	protected equippedShield: THREE.Object3D | null = null;
+
 	public model = new THREE.Group();
 	public limbs!: {
 		leftArm: THREE.Group;
 		rightArm: THREE.Group;
 		leftLeg: THREE.Mesh;
 		rightLeg: THREE.Mesh;
+		rightHand: THREE.Group;
+		leftHand: THREE.Group;
 	};
+
 	public raycaster = new THREE.Raycaster();
 	public mouseNdc = new THREE.Vector2();
 	public moveTarget = new THREE.Vector3();
@@ -155,35 +173,157 @@ export class Entity {
 		head.add(rightEye);
 	}
 
+	protected async loadWieldable(itemIndex: number): Promise<void> {
+		const loader = new GLTFLoader();
+		const itemData = this.world.itemsManager.getItemInfoById(itemIndex);
+		if (!itemData) {
+			this.world.actions?.sendChatMessage(this.world.currentPlayerID, 'No item data on cache.', false);
+			return;
+		}
+		const model = await Cache.getObjectURLByAssetName(itemData.modelName);
+		if (!model) {
+			this.world.actions?.sendChatMessage(this.world.currentPlayerID, 'No model for item available.', false);
+			return;
+		}
+		loader.load(
+			new URL(model, import.meta.url).href,
+			gltf => {
+				if (itemData.type === 'weapon') {
+					this.attachWeapon(gltf.scene);
+				}
+
+				if (itemData.type === 'shield') {
+					this.attachShield(gltf.scene);
+				}
+			},
+			undefined,
+			err => console.error(err),
+		);
+	}
+
+	protected removeWeapon(): void {
+		if (!this.limbs.rightHand || !this.equippedWeapon) return;
+
+		this.limbs.rightHand.remove(this.equippedWeapon);
+
+		// Optional but correct: free GPU memory
+		this.equippedWeapon.traverse(obj => {
+			if ((obj as THREE.Mesh).geometry) {
+				(obj as THREE.Mesh).geometry.dispose();
+			}
+			if ((obj as THREE.Mesh).material) {
+				const mat = (obj as THREE.Mesh).material;
+				if (Array.isArray(mat)) {
+					mat.forEach(m => m.dispose());
+				} else {
+					mat.dispose();
+				}
+			}
+		});
+
+		this.equippedWeapon = null;
+	}
+
+	protected removeShield(): void {
+		if (!this.limbs.leftHand || !this.equippedShield) return;
+
+		this.limbs.leftHand.remove(this.equippedShield);
+
+		// Optional but correct: free GPU memory
+		this.equippedShield?.traverse(obj => {
+			if ((obj as THREE.Mesh).geometry) {
+				(obj as THREE.Mesh).geometry.dispose();
+			}
+			if ((obj as THREE.Mesh).material) {
+				const mat = (obj as THREE.Mesh).material;
+				if (Array.isArray(mat)) {
+					mat.forEach(m => m.dispose());
+				} else {
+					mat.dispose();
+				}
+			}
+		});
+
+		this.equippedShield = null;
+	}
+
+	private attachShield(shield: THREE.Object3D): void {
+		if (!this.limbs.leftHand) return;
+
+		// Remove existing weapon first
+		this.removeShield();
+
+		shield.position.set(0, 0, 0);
+		shield.rotation.set(0, 0, 0);
+		shield.scale.set(1, 1, 1);
+
+		this.limbs.leftHand.add(shield);
+		this.equippedShield = shield;
+	}
+
+	private attachWeapon(weapon: THREE.Object3D): void {
+		if (!this.limbs.rightHand) return;
+
+		// Remove existing weapon first
+		this.removeWeapon();
+
+		weapon.position.set(0, 0, 0);
+		weapon.rotation.set(0, 0, 0);
+		weapon.scale.set(1, 1, 1);
+
+		this.limbs.rightHand.add(weapon);
+		this.equippedWeapon = weapon;
+	}
+
 	private makeArms(armsColor: number): void {
 		const clothMat = new THREE.MeshStandardMaterial({
-			color: armsColor, // slightly dark green
+			color: armsColor,
 			flatShading: true,
 		});
 
 		const armHeight = 1.15;
 		const armGeo = new THREE.BoxGeometry(0.2, armHeight, 0.23);
 
-		const shoulderY = 2.05; // adjust if torso changes
+		const shoulderY = 2.05;
 		const shoulderZ = 0.05;
 
+		// ===== LEFT ARM =====
 		const leftShoulder = new THREE.Group();
 		leftShoulder.position.set(-0.5, shoulderY, shoulderZ);
 		this.model.add(leftShoulder);
 
+		const leftUpperArm = new THREE.Group();
+		leftShoulder.add(leftUpperArm);
+
+		const leftArmMesh = new THREE.Mesh(armGeo, clothMat);
+		leftArmMesh.position.y = -armHeight / 2;
+		leftUpperArm.add(leftArmMesh);
+
+		const leftHand = new THREE.Group();
+		leftHand.position.set(0, -armHeight, 0);
+		leftUpperArm.add(leftHand);
+
+		// ===== RIGHT ARM =====
 		const rightShoulder = new THREE.Group();
 		rightShoulder.position.set(0.5, shoulderY, shoulderZ);
 		this.model.add(rightShoulder);
-		const leftArm = new THREE.Mesh(armGeo, clothMat);
-		leftArm.position.y = -armHeight / 2;
-		leftShoulder.add(leftArm);
 
-		const rightArm = new THREE.Mesh(armGeo, clothMat);
-		rightArm.position.y = -armHeight / 2;
-		rightShoulder.add(rightArm);
+		const rightUpperArm = new THREE.Group();
+		rightShoulder.add(rightUpperArm);
 
-		this.limbs.rightArm = rightShoulder;
-		this.limbs.leftArm = leftShoulder;
+		const rightArmMesh = new THREE.Mesh(armGeo, clothMat);
+		rightArmMesh.position.y = -armHeight / 2;
+		rightUpperArm.add(rightArmMesh);
+
+		const rightHand = new THREE.Group();
+		rightHand.position.set(0, -armHeight, 0);
+		rightUpperArm.add(rightHand);
+
+		// ===== STORE REFERENCES =====
+		this.limbs.leftArm = leftUpperArm;
+		this.limbs.rightArm = rightUpperArm;
+		this.limbs.leftHand = leftHand;
+		this.limbs.rightHand = rightHand;
 	}
 
 	private makeHead(): void {
@@ -273,5 +413,17 @@ export class Entity {
 
 		this.limbs.leftLeg = leftLeg;
 		this.limbs.rightLeg = rightLeg;
+	}
+
+	public getCombatLevel(): number {
+		const hitpointsLevel = ExperienceUtils.getLevelByExp(this.skills[3]);
+		const attackLevel = ExperienceUtils.getLevelByExp(this.skills[1]);
+		const strengthLevel = ExperienceUtils.getLevelByExp(this.skills[2]);
+		const defenceLevel = ExperienceUtils.getLevelByExp(this.skills[4]);
+
+		const base = 0.25 * (defenceLevel + hitpointsLevel);
+		const melee = 0.325 * (attackLevel + strengthLevel);
+
+		return Math.floor(base + melee);
 	}
 }

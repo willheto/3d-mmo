@@ -5,16 +5,16 @@ interface StaticItemData {
 	name: string;
 	examine: string;
 	isStackable: boolean;
-	spriteName: string;
 	value: number;
+	modelName: string;
+	isWieldable: boolean;
+	isEdible: boolean;
+	type: string;
+	iconName: string;
 }
 
 export default class ItemsManager {
 	private items: StaticItemData[] = [];
-	public itemSprites: {
-		sprite: HTMLImageElement;
-		name: string;
-	}[] = [];
 
 	constructor() {
 		this.loadItems();
@@ -29,15 +29,6 @@ export default class ItemsManager {
 
 		const items = await fetch(blob).then(response => response.json());
 		this.items = items;
-
-		items.forEach(async (item: StaticItemData) => {
-			const sprite = await Cache.getObjectURLByAssetName(item.spriteName);
-			if (!sprite) return;
-
-			const image = new Image();
-			image.src = sprite;
-			this.itemSprites.push({ sprite: image, name: item.spriteName });
-		});
 	}
 
 	public getItemInfoById(id: number): StaticItemData | null {

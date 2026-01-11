@@ -4,13 +4,13 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.URL;
-import com.g8e.util.Logger;
 
 import com.g8e.gameserver.World;
 import com.g8e.gameserver.models.objects.DespawningItem;
 import com.g8e.gameserver.models.objects.Edible;
 import com.g8e.gameserver.models.objects.Item;
 import com.g8e.gameserver.models.objects.Wieldable;
+import com.g8e.util.Logger;
 import com.google.gson.Gson;
 
 public class ItemsManager {
@@ -113,9 +113,8 @@ public class ItemsManager {
             return;
         }
 
-        Item newItem = new Item(item.getItemID(), item.getName(), item.getExamine(), item.isWieldable(),
+        Item newItem = new Item(item.getItemID(), item.isWieldable(),
                 item.isStackable(),
-                item.getSpriteName(),
                 item.getValue());
         newItem.setWorldX(x);
         newItem.setWorldY(y);
@@ -133,9 +132,8 @@ public class ItemsManager {
             return;
         }
 
-        Item newItem = new Item(item.getItemID(), item.getName(), item.getExamine(), item.isWieldable(),
+        Item newItem = new Item(item.getItemID(), item.isWieldable(),
                 item.isStackable(),
-                item.getSpriteName(),
                 item.getValue());
         newItem.setWorldX(x);
         newItem.setWorldY(y);
@@ -181,9 +179,8 @@ public class ItemsManager {
             }
         }
 
-        Item newItem = new Item(item.getItemID(), item.getName(), item.getExamine(), item.isWieldable(),
+        Item newItem = new Item(item.getItemID(), item.isWieldable(),
                 item.isStackable(),
-                item.getSpriteName(),
                 item.getValue());
         newItem.setWorldX(x);
         newItem.setWorldY(y);

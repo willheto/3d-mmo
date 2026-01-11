@@ -4,73 +4,82 @@ import java.util.List;
 
 import com.g8e.gameserver.World;
 import com.g8e.gameserver.enums.Direction;
-import com.g8e.gameserver.models.ChatMessage;
-import com.g8e.gameserver.models.Chunkable;
+import com.g8e.gameserver.enums.GoalAction;
 import com.g8e.gameserver.pathfinding.AStar;
 import com.g8e.gameserver.pathfinding.PathNode;
 import com.g8e.gameserver.tile.Tile;
 import com.g8e.gameserver.tile.TilePosition;
 
-public abstract class Entity implements Chunkable {
+public abstract class Entity {
     public String entityID;
-    public int entityIndex;
+    public int worldX;
+    public int worldY;
+    public Direction nextTileDirection = Direction.NONE;
+    public Direction facingDirection = Direction.DOWN;
+    public List<PathNode> currentPath;
+
     public transient World world;
     public transient AStar pathFinder;
 
-    public transient int originalWorldX;
-    public transient int originalWorldY;
-    public int worldX;
-    public int worldY;
+    public transient int originalWorldX; // Where entity respawns
+    public transient int originalWorldY; // Where entity respawns
 
-    public TilePosition targetTile = null;
-    public TilePosition newTargetTile = null;
-    public Direction nextTileDirection = null;
+    public transient TilePosition targetTile = null;
+    public transient TilePosition newTargetTile = null;
+    protected transient TilePosition targetEntityLastPosition;
 
-    public String name;
-    public String examine;
-    public int type; // 0 = player, 1 = npc, 2 = monster
+    public transient int followCounter = 0;
+    public transient int shouldFollow = 0;
+    public transient int dyingCounter = 0;
 
-    protected int tickCounter = 0;
-    public int followCounter = 0;
-    public int shouldFollow = 0;
-    public String targetItemID = null;
-    public Direction facingDirection = Direction.DOWN;
+    public transient String targetItemID = null;
+    public transient String interactionTargetID = null;
 
-    public List<PathNode> currentPath;
-    protected TilePosition targetEntityLastPosition;
-    protected Integer goalAction = null; // 1 talk, 2 attack, 3 trade
+    protected transient GoalAction goalAction;
+
+    public transient int wanderRange = 5;
+    public transient int interactionRange = 1;
+
     public boolean isDying = false;
-    public int dyingCounter = 0;
 
-    public int currentChunk;
+    public int entityIDChanged = 1;
 
-    public int wanderRange = 5;
-    public int interactionRange = 1;
-    public String interactionTargetID = null;
-    public int snareCounter;
+    public int worldXChanged = 1;
+    public int worldYChanged = 1;
+    public int facingDirectionChanged = 1;
 
-    public Entity(String entityID, int entityIndex, World world, int worldX, int worldY, String name, String examine,
-            int type) {
+    public int targetTileChanged = 1;
+    public int newTargetTileChanged = 1;
+    public int nextTileDirectionChanged = 1;
+    public int currentPathChanged = 1;
+    public int targetEntityLastPositionChanged = 1;
+
+    public int followCounterChanged = 1;
+    public int shouldFollowChanged = 1;
+    public int dyingCounterChanged = 1;
+
+    public int targetItemIDChanged = 1;
+    public int interactionTargetIDChanged = 1;
+
+    public int goalActionChanged = 1;
+
+    public int wanderRangeChanged = 1;
+    public int interactionRangeChanged = 1;
+
+    public int isDyingChanged = 1;
+
+    public Entity(String entityID, World world, int worldX, int worldY) {
+        this.goalAction = null;
         this.entityID = entityID;
         this.world = world;
         this.originalWorldX = worldX;
         this.originalWorldY = worldY;
         this.worldX = worldX;
         this.worldY = worldY;
-        this.name = name;
-        this.examine = examine;
-        this.type = type;
-        this.entityIndex = entityIndex;
         this.pathFinder = new AStar(world);
-        updateChunk();
     }
 
     public abstract void update();
-
-    @Override
-    public int getCurrentChunk() {
-        return this.currentChunk;
-    }
 
     protected void setNewTargetTileWithingWanderArea() {
         TilePosition randomPosition = new TilePosition(
@@ -83,13 +92,13 @@ public abstract class Entity implements Chunkable {
         // Check if the new target tile is walkable
         boolean collision = this.world.tileManager.getCollisionByXandY(randomPosition.x, randomPosition.y);
         if (!collision) {
-            this.newTargetTile = randomPosition;
+            setNewTargetTile(randomPosition);
         }
     }
 
     protected boolean isTargetTileNotWithinWanderArea() {
-        TilePosition targetTile = this.getTarget();
-        if (targetTile == null) {
+        TilePosition currentTargetTile = this.getTarget();
+        if (currentTargetTile == null) {
             return false;
         }
 
@@ -147,13 +156,11 @@ public abstract class Entity implements Chunkable {
                     && this.targetEntityLastPosition.getY() == entityTile.getY()) {
                 return;
             }
-            this.targetEntityLastPosition = entityTile;
-            this.newTargetTile = getPositionOneTileAwayFromTarget(entityTile);
-
+            setTargetEntityLastPosition(entityTile);
+            setNewTargetTile(getPositionOneTileAwayFromTarget(entityTile));
         } else {
-            ((Combatant) this).targetedEntityID = null;
+            ((Combatant) this).setTargetedEntityID(null);
         }
-
     }
 
     protected Direction getDirectionTowardsTile(int entityX, int entityY) {
@@ -170,9 +177,6 @@ public abstract class Entity implements Chunkable {
     }
 
     protected void moveToNextTile() {
-        if (this.nextTileDirection == null) {
-            return;
-        }
         switch (this.nextTileDirection) {
             case UP -> move(this.worldX, this.worldY - 1);
             case DOWN -> move(this.worldX, this.worldY + 1);
@@ -181,18 +185,9 @@ public abstract class Entity implements Chunkable {
             default -> {
             }
         }
-
     }
 
     protected void moveTowardsTarget() {
-        if (this.snareCounter > 0) {
-            moveToNextTile();
-            this.nextTileDirection = null;
-            this.world.chatMessages
-                    .add(new ChatMessage(name, "A magical force prevents you from moving!", System.currentTimeMillis(),
-                            false));
-            return;
-        }
 
         if (this.nextTileDirection != null) {
             moveToNextTile();
@@ -212,41 +207,28 @@ public abstract class Entity implements Chunkable {
 
             currentPath = this.pathFinder.findPath(this.worldX, this.worldY, target.x, target.y);
 
-            if (currentPath.size() == 0) {
-                this.world.chatMessages
-                        .add(new ChatMessage(name, "I can't reach that!", System.currentTimeMillis(), false));
-            }
-
             if (currentPath.size() < 2) {
                 currentPath = null;
-                this.newTargetTile = null;
-                this.targetTile = null;
-                this.nextTileDirection = null;
+                stopAllMovement();
                 return;
             }
-            this.targetTile = newTargetTile;
-            this.newTargetTile = null;
+            setTargetTile(newTargetTile);
+            setNewTargetTile(null);
 
             int deltaX = currentPath.get(1).x - this.worldX;
             int deltaY = currentPath.get(1).y - this.worldY;
-            Direction nextTileDirection = this.getDirection(deltaX, deltaY);
-            this.nextTileDirection = nextTileDirection;
-            this.facingDirection = nextTileDirection;
-
+            setNextTileDirection(this.getDirection(deltaX, deltaY));
+            setFacingDirection(nextTileDirection);
             return;
         }
 
-        if (currentPath == null || currentPath.size() == 0) {
-            this.world.chatMessages
-                    .add(new ChatMessage(name, "I can't reach that!", System.currentTimeMillis(), false));
+        if (currentPath == null || currentPath.isEmpty()) {
             return;
         }
 
         // Already at target
         if (currentPath.size() == 1) {
-            this.nextTileDirection = null;
-            this.targetTile = null;
-            this.newTargetTile = null;
+            stopAllMovement();
             return;
         }
 
@@ -256,8 +238,7 @@ public abstract class Entity implements Chunkable {
             moveAlongPath(nextStep);
             if (this.targetItemID != null && this instanceof Player) {
                 ((Player) this).takeItem(targetItemID);
-                this.targetItemID = null;
-
+                setTargetItemID(null);
             }
         } else if (currentPath.size() > 2) {
             PathNode nextStep = currentPath.get(1);
@@ -268,42 +249,26 @@ public abstract class Entity implements Chunkable {
     }
 
     protected void moveAlongPath(PathNode nextStep, PathNode nextNextStep) {
-        /* move(nextStep.x, nextStep.y); */
-
-        Direction nextTileDirection = this.getDirection(nextNextStep.x - nextStep.x, nextNextStep.y - nextStep.y);
-        this.nextTileDirection = nextTileDirection;
-        this.facingDirection = nextTileDirection;
+        Direction direction = this.getDirection(nextNextStep.x - nextStep.x, nextNextStep.y - nextStep.y);
+        setNextTileDirection(direction);
+        setFacingDirection(direction);
         currentPath.remove(0);
     }
 
     // Last step
     protected void moveAlongPath(PathNode nextStep) {
-        this.nextTileDirection = null;
-
-        /* move(nextStep.x, nextStep.y); */
-        this.targetTile = null;
+        setNextTileDirection(Direction.NONE);
+        setTargetTile(null);
         currentPath = null;
     }
 
     // Always use move instead of explicitly setting worldX and worldY
     // This will ensure that the chunk is updated correctly
     protected void move(int worldX, int worldY) {
-        this.worldX = worldX;
-        this.worldY = worldY;
-        if (this instanceof Player) {
-            ((Player) this).savePosition();
-        }
-        updateChunk();
-    }
-
-    private void updateChunk() {
-        int chunk = this.world.tileManager.getChunkByWorldXandY(this.worldX, this.worldY);
-        if (this.currentChunk != chunk) {
-            this.currentChunk = chunk;
-
-            if (this instanceof Player) {
-                ((Player) this).needsFullChunkUpdate = true;
-            }
+        setWorldX(worldX);
+        setWorldY(worldY);
+        if (this instanceof Player player) {
+            player.savePosition();
         }
     }
 
@@ -335,12 +300,89 @@ public abstract class Entity implements Chunkable {
         return this.newTargetTile != null ? this.newTargetTile : this.targetTile;
     }
 
+    protected void stopAllMovement() {
+        setNewTargetTile(null);
+        setTargetTile(null);
+        setNextTileDirection(Direction.NONE);
+    }
+
     public void setWanderRange(int wanderRange) {
         this.wanderRange = wanderRange;
+        this.wanderRangeChanged = 1;
     }
 
     public void setInteractionRange(int interactionRange) {
         this.interactionRange = interactionRange;
+        this.interactionRangeChanged = 1;
     }
 
+    protected void setTargetItemID(String id) {
+        this.targetItemID = id;
+        this.targetItemIDChanged = 1;
+    }
+
+    private void setWorldX(int x) {
+        this.worldX = x;
+        this.worldXChanged = 1;
+    }
+
+    private void setWorldY(int y) {
+        this.worldY = y;
+        this.worldYChanged = 1;
+    }
+
+    protected void setTargetTile(TilePosition tile) {
+        this.targetTile = tile;
+        this.targetTileChanged = 1;
+    }
+
+    protected void setNextTileDirection(Direction dir) {
+        this.nextTileDirection = dir;
+        this.nextTileDirectionChanged = 1;
+    }
+
+    protected void setFacingDirection(Direction dir) {
+        this.facingDirection = dir;
+        this.facingDirectionChanged = 1;
+    }
+
+    protected void setNewTargetTile(TilePosition tile) {
+        this.newTargetTile = tile;
+        this.newTargetTileChanged = 1;
+    }
+
+    protected void setIsDying(boolean isDying) {
+        this.isDying = isDying;
+        this.isDyingChanged = 1;
+    }
+
+    protected void setFollowCounter(int counter) {
+        this.followCounter = counter;
+        this.followCounterChanged = 1;
+    }
+
+    protected void setInteractionTargetID(String id) {
+        this.interactionTargetID = id;
+        this.interactionTargetIDChanged = 1;
+    }
+
+    protected void setGoalAction(GoalAction action) {
+        this.goalAction = action;
+        this.goalActionChanged = 1;
+    }
+
+    protected void setTargetEntityLastPosition(TilePosition position) {
+        this.targetEntityLastPosition = position;
+        this.targetEntityLastPositionChanged = 1;
+    }
+
+    protected void setDyingCounter(int counter) {
+        this.dyingCounter = counter;
+        this.dyingCounterChanged = 1;
+    }
+
+    protected void setCurrentPath(List<PathNode> path) {
+        this.currentPath = path;
+        this.currentPathChanged = 1;
+    }
 }

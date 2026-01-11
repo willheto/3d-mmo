@@ -1,8 +1,8 @@
 package com.g8e.loginserver.models;
 
 public class LoginResponse {
-    private int type;
-    private int response;
+    final private int type;
+    final private int response;
     private String loginToken;
 
     public LoginResponse(int type, int response) {

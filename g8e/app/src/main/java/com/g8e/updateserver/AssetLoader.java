@@ -4,10 +4,15 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.nio.file.*;
+import java.nio.file.DirectoryStream;
+import java.nio.file.FileSystem;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.HashMap;
+import java.util.List;
 
 public class AssetLoader {
 
@@ -29,7 +34,7 @@ public class AssetLoader {
         if (uri.getScheme().equals("jar")) {
             // If the file system is not already opened, open it
             if (fs == null) {
-                fs = FileSystems.newFileSystem(uri, new HashMap<String, Object>());
+                fs = FileSystems.newFileSystem(uri, new HashMap<>());
             }
 
             Path path = fs.getPath(directoryPath);
@@ -69,9 +74,9 @@ public class AssetLoader {
     }
 
     public static class Asset {
-        private String name;
-        private String type;
-        private Object data; // Can be a byte array for files or List<Asset> for directories
+        final private String name;
+        final private String type;
+        final private Object data;
 
         public Asset(String name, String type, Object data) {
             this.name = name;

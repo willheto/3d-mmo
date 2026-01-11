@@ -85,7 +85,7 @@ export default class Draw2D {
 		canvas2d.fillRect(((width / 2) | 0) - 150 + progress * 3, y + 2, 300 - progress * 3, 30);
 
 		// draw text
-		canvas2d.font = '14px Pkmn';
+		canvas2d.font = '18px Pkmn';
 		canvas2d.textAlign = 'center';
 		canvas2d.fillStyle = 'white';
 		canvas2d.fillText(message, (width / 2) | 0, y + 22);
@@ -116,7 +116,7 @@ export default class Draw2D {
 		if (!world.modalObject) return;
 		const { modalX, modalY, modalOptions } = world.modalObject;
 
-		canvas2d.font = '14px Pkmn';
+		canvas2d.font = '18px Pkmn';
 
 		const getLongestOptionsLengthPX = (): number => {
 			let longestOptionLength = 0;
@@ -156,7 +156,7 @@ export default class Draw2D {
 		canvas2d.strokeRect(modalX, modalY, modalWidth, modalHeight);
 
 		// Set text properties
-		canvas2d.font = '14px Pkmn';
+		canvas2d.font = '16px Pkmn';
 		canvas2d.textAlign = 'left';
 		canvas2d.textBaseline = 'top';
 
@@ -226,6 +226,6 @@ export default class Draw2D {
 			canvas.style.pointerEvents = 'none';
 		}
 
-		canvas2d.textBaseline = 'alphabetic';
+		canvas2d.textBaseline = 'middle';
 	}
 }

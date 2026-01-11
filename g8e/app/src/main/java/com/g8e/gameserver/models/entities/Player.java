@@ -6,10 +6,9 @@ import java.util.List;
 import com.g8e.db.CommonQueries;
 import com.g8e.db.models.DBPlayer;
 import com.g8e.gameserver.World;
+import com.g8e.gameserver.enums.Direction;
+import com.g8e.gameserver.enums.GoalAction;
 import com.g8e.gameserver.models.ChatMessage;
-import com.g8e.gameserver.models.Shop;
-import com.g8e.gameserver.models.Stock;
-import com.g8e.gameserver.models.events.MagicEvent;
 import com.g8e.gameserver.models.events.SoundEvent;
 import com.g8e.gameserver.models.events.TalkEvent;
 import com.g8e.gameserver.models.events.TradeEvent;
@@ -18,7 +17,6 @@ import com.g8e.gameserver.models.objects.Item;
 import com.g8e.gameserver.models.objects.Wieldable;
 import com.g8e.gameserver.models.quests.Quest;
 import com.g8e.gameserver.models.quests.QuestReward;
-import com.g8e.gameserver.models.spells.Spell;
 import com.g8e.gameserver.network.actions.Action;
 import com.g8e.gameserver.network.actions.ChangeAppearanceAction;
 import com.g8e.gameserver.network.actions.attackStyle.ChangeAttackStyleAction;
@@ -26,7 +24,6 @@ import com.g8e.gameserver.network.actions.drop.DropItemAction;
 import com.g8e.gameserver.network.actions.edibles.EatItemAction;
 import com.g8e.gameserver.network.actions.inventory.AddItemToInventoryAction;
 import com.g8e.gameserver.network.actions.inventory.RemoveItemFromInventoryAction;
-import com.g8e.gameserver.network.actions.magic.CastSpellAction;
 import com.g8e.gameserver.network.actions.move.ForceNpcAttackPlayerAction;
 import com.g8e.gameserver.network.actions.move.PlayerAttackMove;
 import com.g8e.gameserver.network.actions.move.PlayerMove;
@@ -46,10 +43,6 @@ import com.g8e.util.Logger;
 import com.google.gson.Gson;
 
 public class Player extends Combatant {
-
-    private static final int playerStartingX = 0;
-    private static final int playerStartingY = 0;
-    public int accountID;
     public int[] inventory = new int[20];
     public int[] inventoryAmounts = new int[20];
     public int[] questProgress = new int[10];
@@ -58,35 +51,44 @@ public class Player extends Combatant {
     public int hairColor;
     public int shirtColor;
     public int pantsColor;
-    public boolean needsFullChunkUpdate = false;
-    public int teleportCounter = 0;
-    public int spellCounter = 0;
-    public String spellTarget = null;
+
+    final public String username;
+
+    private transient static final int PLAYER_STARTING_X = 0;
+    private transient static final int PLAYER_STARTING_Y = 0;
+    public transient int accountID;
+
+    public transient int inventoryChanged = 1;
+    public transient int inventoryAmountsChanged = 1;
+    public transient int questProgressChanged = 1;
+    public transient int influenceChanged = 1;
+    public transient int skinColorChanged = 1;
+    public transient int hairColorChanged = 1;
+    public transient int shirtColorChanged = 1;
+    public transient int pantsColorChanged = 1;
+    public transient int usernameChanged = 1;
 
     public Player(World world, DBPlayer dbPlayer, String uniquePlayerID, String username, int accountID) {
-        super(uniquePlayerID, 0, world, dbPlayer.getWorldX(), dbPlayer.getWorldY(), username,
-                "That's " + username + "!", 0);
+        super(uniquePlayerID, world, dbPlayer.getWorldX(), dbPlayer.getWorldY());
         this.accountID = accountID;
-        this.currentHitpoints = ExperienceUtils.getLevelByExp(dbPlayer.getHitpointsExperience());
+        this.username = username;
+
+        this.originalWorldX = PLAYER_STARTING_X;
+        this.originalWorldY = PLAYER_STARTING_Y;
 
         this.loadPlayerSkills(dbPlayer);
-        this.combatLevel = this.getCombatLevel();
-        this.weapon = dbPlayer.getWeapon();
         this.loadPlayerInventory(dbPlayer);
         this.loadQuestProgress(dbPlayer);
-        this.attackStyle = "attack";
+
+        this.weapon = dbPlayer.getWeapon();
+        this.shield = dbPlayer.getShield();
         this.skinColor = dbPlayer.getSkinColor();
         this.hairColor = dbPlayer.getHairColor();
         this.shirtColor = dbPlayer.getShirtColor();
         this.pantsColor = dbPlayer.getPantsColor();
-        this.currentChunk = world.tileManager.getChunkByWorldXandY(dbPlayer.getWorldX(), dbPlayer.getWorldY());
-        this.originalWorldX = playerStartingX;
-        this.originalWorldY = playerStartingY;
-    }
+        this.currentHitpoints = ExperienceUtils.getLevelByExp(dbPlayer.getHitpointsExperience());
 
-    @Override
-    public int getCurrentChunk() {
-        return this.currentChunk;
+        this.attackStyle = "attack";
     }
 
     private void loadQuestProgress(DBPlayer dbPlayer) {
@@ -102,52 +104,64 @@ public class Player extends Combatant {
 
     }
 
+    public void clearChangedFlags() {
+        skinColorChanged = 0;
+        hairColorChanged = 0;
+        shirtColorChanged = 0;
+        pantsColorChanged = 0;
+        usernameChanged = 0;
+
+        skillsChanged = 0;
+        currentHitpointsChanged = 0;
+        targetedEntityIDChanged = 0;
+
+        lastDamageDealtChanged = 0;
+        lastDamageDealtCounterChanged = 0;
+        attackTickCounterChanged = 0;
+        isInCombatCounterChanged = 0;
+        attackStyleChanged = 0;
+
+        weaponChanged = 0;
+        shieldChanged = 0;
+        isInCombatChanged = 0;
+
+        worldXChanged = 0;
+        worldYChanged = 0;
+        facingDirectionChanged = 0;
+
+        targetTileChanged = 0;
+        newTargetTileChanged = 0;
+        nextTileDirectionChanged = 0;
+        currentPathChanged = 0;
+        targetEntityLastPositionChanged = 0;
+
+        followCounterChanged = 0;
+        shouldFollowChanged = 0;
+        dyingCounterChanged = 0;
+
+        targetItemIDChanged = 0;
+        interactionTargetIDChanged = 0;
+
+        goalActionChanged = 0;
+        wanderRangeChanged = 0;
+        interactionRangeChanged = 0;
+
+        isDyingChanged = 0;
+        influenceChanged = 0;
+        lastDamageDealtChanged = 0;
+        entityIDChanged = 0;
+
+        questProgressChanged = 0;
+        inventoryAmountsChanged = 0;
+        inventoryChanged = 0;
+        skillsChanged = 0;
+    }
+
+    @Override
     public void update() {
         this.updateCounters();
 
-        if (spellCounter == 1) {
-            if (spellUsed != null) {
-                if (spellUsed.getSpellID() == 3) {
-                    Entity target = this.world.getEntityByID(this.spellTarget);
-                    if (target != null && target instanceof Combatant) {
-                        ((Combatant) target).snareCounter = 10;
-                        this.world.chatMessages
-                                .add(new ChatMessage(target.name, "A magical force prevents you from moving!",
-                                        System.currentTimeMillis(), false));
-                        SoundEvent soundEvent = new SoundEvent("snare.wav", true, false, target.entityID, true);
-                        this.world.tickMagicEvents.add(new MagicEvent(target.entityID, spellUsed.getSpellID(), false));
-                        this.world.tickSoundEvents.add(soundEvent);
-                    }
-                }
-                if (spellUsed.getSpellID() == 2) {
-                    Entity target = this.world.getEntityByID(this.spellTarget);
-                    if (target != null && target instanceof Combatant) {
-                        SoundEvent soundEvent = new SoundEvent("magic_hit.wav", true, false, target.entityID, true);
-                        this.world.tickMagicEvents.add(new MagicEvent(target.entityID, spellUsed.getSpellID(), false));
-                        this.world.tickSoundEvents.add(soundEvent);
-                        this.attackEntity((Combatant) target, true);
-                    }
-                }
-
-                this.spellUsed = null;
-                this.spellTarget = null;
-            }
-        }
-
         if (isDying) {
-            return; // todo, some animation handling? maybe on client side though.
-        }
-
-        if (teleportCounter <= 5 && spellUsed != null && spellUsed.getType() == 1) {
-            this.move(spellUsed.getTargetX(), spellUsed.getTargetY());
-
-            this.needsFullChunkUpdate = true;
-            this.spellUsed = null;
-            SoundEvent soundEvent = new SoundEvent("teleport_arrive.wav", true, false, this.entityID, true);
-            this.world.tickSoundEvents.add(soundEvent);
-        }
-
-        if (teleportCounter > 0) {
             return;
         }
 
@@ -159,76 +173,61 @@ public class Player extends Combatant {
                 return;
             }
 
-            if (goalAction == 2) {
+            if (goalAction == GoalAction.ATTACK) {
                 Entity target = this.world.getEntityByID(((Combatant) this).targetedEntityID);
 
                 if (target.isDying == true) {
-                    this.targetedEntityID = null;
-                    this.goalAction = null;
-                    this.newTargetTile = null;
-                    this.targetTile = null;
-                    this.targetEntityLastPosition = null;
+                    this.setTargetedEntityID(null);
+                    this.setGoalAction(null);
+                    this.stopAllMovement();
+                    this.setTargetEntityLastPosition(null);
                     return;
                 }
             }
 
             if (isOneStepAwayFromTarget()) {
-                if (goalAction == 2) {
-                    Entity entity = this.world.getEntityByID(((Combatant) this).targetedEntityID);
-                    if (entity != null && entity instanceof Combatant) {
-                        ((Combatant) this).attackEntity((Combatant) entity, false);
-                        this.nextTileDirection = null;
-                        this.targetTile = null;
-                        this.newTargetTile = null;
-                        this.targetEntityLastPosition = null;
-                        int entityX = entity.worldX;
-                        int entityY = entity.worldY;
+                Entity entity = this.world.getEntityByID(this.targetedEntityID);
+                if (entity != null) {
+                    setTargetEntityLastPosition(null);
+                    setFacingDirection(this.getDirectionTowardsTile(entity.worldX, entity.worldY));
 
-                        this.facingDirection = this.getDirectionTowardsTile(entityX, entityY);
-                        return;
-                    }
-                } else if (goalAction == 1) {
-                    Entity entity = this.world.getEntityByID(this.targetedEntityID);
-                    if (entity != null && entity instanceof Npc) {
-                        this.nextTileDirection = null;
-                        this.targetTile = null;
-                        this.newTargetTile = null;
-                        this.targetEntityLastPosition = null;
-                        this.goalAction = null;
-                        this.targetedEntityID = null;
-                        TalkEvent talkEvent = new TalkEvent(this.entityID, entity.entityID, entity.entityIndex);
-
-                        if (entity instanceof Combatant && ((Combatant) entity).targetedEntityID == null) {
-                            entity.interactionTargetID = this.entityID;
+                    switch (goalAction) {
+                        case ATTACK -> {
+                            if (entity instanceof Combatant combatant) {
+                                ((Combatant) this).attackEntity(combatant);
+                                stopAllMovement();
+                            }
                         }
+                        case TALK -> {
+                            if (entity instanceof Npc npc) {
+                                stopAllMovement();
+                                this.setGoalAction(null);
+                                this.setTargetedEntityID(null);
 
-                        int entityX = entity.worldX;
-                        int entityY = entity.worldY;
+                                TalkEvent talkEvent = new TalkEvent(this.entityID, entity.entityID,
+                                        npc.entityStaticData.entityIndex);
 
-                        this.facingDirection = this.getDirectionTowardsTile(entityX, entityY);
-                        this.world.tickTalkEvents.add(talkEvent);
-                        return;
+                                if (entity instanceof Combatant && ((Combatant) entity).targetedEntityID == null) {
+                                    entity.setInteractionTargetID(this.entityID);
+                                }
+
+                                this.world.tickTalkEvents.add(talkEvent);
+                            }
+                        }
+                        case TRADE -> {
+                            if (entity instanceof Npc npc) {
+                                this.stopAllMovement();
+                                this.setGoalAction(null);
+                                this.setTargetedEntityID(null);
+                                TradeEvent tradeEvent = new TradeEvent(this.entityID, entity.entityID,
+                                        npc.entityStaticData.entityIndex);
+                                entity.setInteractionTargetID(this.entityID);
+                                this.world.tickTradeEvents.add(tradeEvent);
+                            }
+                        }
+                        default -> {
+                        }
                     }
-
-                } else if (goalAction == 3) {
-                    Entity entity = this.world.getEntityByID(this.targetedEntityID);
-                    if (entity != null && entity instanceof Npc) {
-                        this.nextTileDirection = null;
-                        this.targetTile = null;
-                        this.newTargetTile = null;
-                        this.targetEntityLastPosition = null;
-                        this.goalAction = null;
-                        this.targetedEntityID = null;
-                        TradeEvent tradeEvent = new TradeEvent(this.entityID, entity.entityID, entity.entityIndex);
-                        entity.interactionTargetID = this.entityID;
-                        int entityX = entity.worldX;
-                        int entityY = entity.worldY;
-
-                        this.facingDirection = this.getDirectionTowardsTile(entityX, entityY);
-                        this.world.tickTradeEvents.add(tradeEvent);
-                        return;
-                    }
-
                 }
             }
         }
@@ -248,12 +247,8 @@ public class Player extends Combatant {
             return false;
         }
 
-        if ((Math.abs(this.worldX - target.worldX) == 1 && this.worldY == target.worldY)
-                || (Math.abs(this.worldY - target.worldY) == 1 && this.worldX == target.worldX)) {
-            return true;
-        }
-
-        return false;
+        return (Math.abs(this.worldX - target.worldX) == 1 && this.worldY == target.worldY)
+                || (Math.abs(this.worldY - target.worldY) == 1 && this.worldX == target.worldX);
     }
 
     public void takeItem(String uniqueItemID) {
@@ -261,13 +256,13 @@ public class Player extends Combatant {
         if (item == null) {
             Logger.printError("Item not found");
             this.world.chatMessages
-                    .add(new ChatMessage(this.name, "Too late, it's gone!", System.currentTimeMillis(), false));
+                    .add(new ChatMessage(this.username, "Too late, it's gone!", System.currentTimeMillis(), false));
             return;
         }
         addItemToInventory(item.getItemID(), item.getAmount());
         this.world.itemsManager.removeItem(item.getUniqueID());
 
-        SoundEvent soundEvent = new SoundEvent("pick_up.wav", true, false, this.entityID, false);
+        SoundEvent soundEvent = new SoundEvent("pick_up.ogg", true, false, this.entityID, false);
         this.world.tickSoundEvents.add(soundEvent);
 
     }
@@ -277,7 +272,7 @@ public class Player extends Combatant {
         String questProgressString = gson.toJson(this.questProgress);
         try {
             CommonQueries.savePlayerQuestProgressByAccountId(this.accountID, questProgressString);
-        } catch (Exception e) {
+        } catch (SQLException e) {
             Logger.printError("Failed to save quest progress");
         }
     }
@@ -285,7 +280,7 @@ public class Player extends Combatant {
     public void savePosition() {
         try {
             CommonQueries.savePlayerPositionByAccountId(this.accountID, this.worldX, this.worldY);
-        } catch (Exception e) {
+        } catch (SQLException e) {
             Logger.printError("Failed to save player position");
         }
     }
@@ -296,7 +291,7 @@ public class Player extends Combatant {
         String inventoryAmountsString = gson.toJson(this.inventoryAmounts);
         try {
             CommonQueries.savePlayerInventoryByAccountId(this.accountID, inventoryString, inventoryAmountsString);
-        } catch (Exception e) {
+        } catch (SQLException e) {
             Logger.printError("Failed to save inventory");
         }
     }
@@ -323,112 +318,86 @@ public class Player extends Combatant {
                     + currentLevel + ".";
 
             long timeSent = System.currentTimeMillis();
-            ChatMessage chatMessageModel = new ChatMessage(this.name, levelUpMessage, timeSent, false);
+            ChatMessage chatMessageModel = new ChatMessage(this.username, levelUpMessage, timeSent, false);
             this.world.chatMessages.add(chatMessageModel);
 
-            if (skill == SkillUtils.ATTACK) {
-                SoundEvent soundEvent = new SoundEvent("attack_level_up.ogg", true, true, this.entityID, true);
-                this.world.tickSoundEvents.add(soundEvent);
-            } else if (skill == SkillUtils.STRENGTH) {
-                SoundEvent soundEvent = new SoundEvent("strength_level_up.ogg", true, true, this.entityID, false);
-                this.world.tickSoundEvents.add(soundEvent);
-            } else if (skill == SkillUtils.DEFENCE) {
-                SoundEvent soundEvent = new SoundEvent("defence_level_up.ogg", true, true, this.entityID, false);
-                this.world.tickSoundEvents.add(soundEvent);
-            } else if (skill == SkillUtils.MAGIC) {
-                SoundEvent soundEvent = new SoundEvent("magic_level_up.ogg", true, true, this.entityID, false);
-                this.world.tickSoundEvents.add(soundEvent);
-            } else if (skill == SkillUtils.HITPOINTS) {
-                SoundEvent soundEvent = new SoundEvent("hitpoints_level_up.ogg", true, true, this.entityID, false);
-                this.world.tickSoundEvents.add(soundEvent);
+            switch (skill) {
+                case SkillUtils.ATTACK -> {
+                    SoundEvent soundEvent = new SoundEvent("attack_level_up.ogg", true, true, this.entityID, true);
+                    this.world.tickSoundEvents.add(soundEvent);
+                }
+                case SkillUtils.STRENGTH -> {
+                    SoundEvent soundEvent = new SoundEvent("strength_level_up.ogg", true, true, this.entityID, false);
+                    this.world.tickSoundEvents.add(soundEvent);
+                }
+                case SkillUtils.DEFENCE -> {
+                    SoundEvent soundEvent = new SoundEvent("defence_level_up.ogg", true, true, this.entityID, false);
+                    this.world.tickSoundEvents.add(soundEvent);
+                }
+
+                case SkillUtils.HITPOINTS -> {
+                    SoundEvent soundEvent = new SoundEvent("hitpoints_level_up.ogg", true, true, this.entityID, false);
+                    this.world.tickSoundEvents.add(soundEvent);
+                }
+                default -> {
+                }
             }
 
         }
-
-        this.combatLevel = this.getCombatLevel();
+        this.skillsChanged = 1;
         saveSkillXp(skill);
     }
 
     public void saveSkillXp(int skill) {
         try {
             CommonQueries.savePlayerXpByAccountId(this.accountID, skill, this.skills[skill]);
-        } catch (Exception e) {
+        } catch (SQLException e) {
             Logger.printError("Failed to save skill xp");
         }
-    }
-
-    private void updateInventoryOrder(int[] requestedInventory) {
-        if (requestedInventory.length != this.inventory.length) {
-            Logger.printError("Inventory length mismatch");
-            return;
-        }
-
-        // check if inventory has same items but in different order
-        for (int inventory : this.inventory) {
-            boolean found = false;
-            for (int requestedItem : requestedInventory) {
-                if (inventory == requestedItem) {
-                    continue;
-                }
-            }
-
-            if (!found) {
-                Logger.printError("Inventory mismatch");
-                return;
-            }
-        }
-
-        this.inventory = requestedInventory;
     }
 
     public void setTickActions(List<Action> actions) {
         for (Action action : actions) {
 
-            if (action instanceof ChangeAppearanceAction) {
-                ChangeAppearanceAction changeAppearanceAction = (ChangeAppearanceAction) action;
-                this.skinColor = changeAppearanceAction.getSkinColor();
-                this.hairColor = changeAppearanceAction.getHairColor();
-                this.shirtColor = changeAppearanceAction.getShirtColor();
-                this.pantsColor = changeAppearanceAction.getPantsColor();
+            if (action instanceof ChangeAppearanceAction changeAppearanceAction) {
+                setSkinColor(changeAppearanceAction.getSkinColor());
+                setHairColor(changeAppearanceAction.getHairColor());
+                setShirtColor(changeAppearanceAction.getShirtColor());
+                setPantsColor(changeAppearanceAction.getPantsColor());
+
                 try {
                     CommonQueries.savePlayerAppearanceByAccountId(
                             this.accountID, this.skinColor, this.hairColor, this.shirtColor, this.pantsColor);
                 } catch (SQLException e) {
-                    e.printStackTrace();
+                    Logger.printError(e.getMessage());
                 }
-
             }
 
-            if (action instanceof PlayerMove) {
-                PlayerMove playerMove = (PlayerMove) action;
-                this.newTargetTile = new TilePosition(playerMove.getX(), playerMove.getY());
-                this.targetItemID = null;
-                this.targetedEntityID = null;
-                this.goalAction = null;
+            if (action instanceof PlayerMove playerMove) {
+                setNewTargetTile(new TilePosition(playerMove.getX(), playerMove.getY()));
+                setTargetItemID(null);
+                setTargetedEntityID(null);
+                setGoalAction(null);
             }
 
-            if (action instanceof PlayerAttackMove) {
-                PlayerAttackMove playerAttackMove = (PlayerAttackMove) action;
+            if (action instanceof PlayerAttackMove playerAttackMove) {
                 Entity npc = this.world.getEntityByID(playerAttackMove.getEntityID());
                 if (npc == null) {
                     Logger.printError("NPC not found");
                     return;
                 }
-                Entity entity = this.world.getEntityByID(playerAttackMove.getEntityID());
 
+                setNewTargetTile(new TilePosition(npc.worldX, npc.worldY));
                 this.newTargetTile = new TilePosition(npc.worldX, npc.worldY);
-                this.targetedEntityID = playerAttackMove.getEntityID();
-                this.goalAction = 2; // Attack action TODO
+                setTargetedEntityID(playerAttackMove.getEntityID());
+                setGoalAction(GoalAction.ATTACK);
             }
 
-            if (action instanceof DropItemAction) {
-                DropItemAction dropItemAction = (DropItemAction) action;
+            if (action instanceof DropItemAction dropItemAction) {
                 this.dropItem(dropItemAction.getInventoryIndex());
             }
 
-            if (action instanceof WieldItemAction) {
-                WieldItemAction wieldItemAction = (WieldItemAction) action;
-
+            if (action instanceof WieldItemAction wieldItemAction) {
                 int itemID = this.inventory[wieldItemAction.getInventoryIndex()];
                 Wieldable item = this.world.itemsManager.getWieldableInfoByItemID(itemID);
 
@@ -437,84 +406,58 @@ public class Player extends Combatant {
                     return;
                 }
 
-                if (item.getType().equals("sword") || item.getType().equals("axe")) {
-                    this.weapon = wieldItemAction.getInventoryIndex();
-                    saveWieldables();
-                } else if (item.getType().equals("shield")) {
-                    this.shield = wieldItemAction.getInventoryIndex();
-                    saveWieldables();
-                } else if (item.getType().equals("helmet")) {
-                    this.helmet = wieldItemAction.getInventoryIndex();
-                    saveWieldables();
-                } else if (item.getType().equals("bodyArmor")) {
-                    this.bodyArmor = wieldItemAction.getInventoryIndex();
-                    saveWieldables();
-                } else if (item.getType().equals("legArmor")) {
-                    this.legArmor = wieldItemAction.getInventoryIndex();
-                    saveWieldables();
-                } else if (item.getType().equals("gloves")) {
-                    this.gloves = wieldItemAction.getInventoryIndex();
-                    saveWieldables();
-                } else if (item.getType().equals("boots")) {
-                    this.boots = wieldItemAction.getInventoryIndex();
-                    saveWieldables();
-                } else if (item.getType().equals("neckwear")) {
-                    this.neckwear = wieldItemAction.getInventoryIndex();
-                    saveWieldables();
-                } else if (item.getType().equals("ring")) {
-                    this.ring = wieldItemAction.getInventoryIndex();
-                    saveWieldables();
-                } else {
-                    Logger.printError("Item is not wieldable");
+                switch (item.getType()) {
+                    case "sword" -> {
+                        Logger.printDebug("wielding item.");
+                        setWeapon(wieldItemAction.getInventoryIndex());
+                        saveWieldables();
+                    }
+                    case "shield" -> {
+                        setShield(wieldItemAction.getInventoryIndex());
+                        saveWieldables();
+                    }
+                    default -> Logger.printError("Item is not wieldable");
                 }
 
             }
 
-            if (action instanceof PlayerTakeMoveAction) {
-                PlayerTakeMoveAction playerTakeMoveAction = (PlayerTakeMoveAction) action;
+            if (action instanceof PlayerTakeMoveAction playerTakeMoveAction) {
                 this.handlePlayerTakeMove(playerTakeMoveAction.getUniqueItemID());
-                this.goalAction = null;
+                setGoalAction(null);
             }
 
-            if (action instanceof UseItemAction) {
-                UseItemAction useItemAction = (UseItemAction) action;
+            if (action instanceof UseItemAction useItemAction) {
                 this.useItem(useItemAction.getItemID(), useItemAction.getTargetID());
             }
 
-            if (action instanceof UnwieldAction) {
-                UnwieldAction unwieldAction = (UnwieldAction) action;
+            if (action instanceof UnwieldAction unwieldAction) {
                 this.unwieldItem(unwieldAction.getInventoryIndex());
             }
 
-            if (action instanceof EatItemAction) {
-                EatItemAction eatItemAction = (EatItemAction) action;
+            if (action instanceof EatItemAction eatItemAction) {
                 this.eatItem(eatItemAction.getInventoryIndex());
             }
 
-            if (action instanceof QuestProgressUpdateAction) {
-                QuestProgressUpdateAction questProgressUpdateAction = (QuestProgressUpdateAction) action;
+            if (action instanceof QuestProgressUpdateAction questProgressUpdateAction) {
                 this.questProgressUpdate(questProgressUpdateAction.getQuestID(),
                         questProgressUpdateAction.getProgress());
+                this.questProgressChanged = 1;
             }
 
-            if (action instanceof PlayerTalkMoveAction) {
-                PlayerTalkMoveAction playerTalkMoveAction = (PlayerTalkMoveAction) action;
-
+            if (action instanceof PlayerTalkMoveAction playerTalkMoveAction) {
                 Entity entity = this.world.getEntityByID(playerTalkMoveAction.getEntityID());
                 if (entity != null) {
-                    this.targetedEntityID = playerTalkMoveAction.getEntityID();
-                    this.goalAction = 1;
-                    this.newTargetTile = new TilePosition(entity.worldX, entity.worldY);
+                    setTargetedEntityID(playerTalkMoveAction.getEntityID());
+                    setGoalAction(GoalAction.TALK);
+                    setTargetTile(new TilePosition(entity.worldX, entity.worldY));
                 }
             }
 
-            if (action instanceof ChangeAttackStyleAction) {
-                ChangeAttackStyleAction changeAttackStyleAction = (ChangeAttackStyleAction) action;
-                this.attackStyle = changeAttackStyleAction.getAttackStyle();
+            if (action instanceof ChangeAttackStyleAction changeAttackStyleAction) {
+                setAttackStyle(changeAttackStyleAction.getAttackStyle());
             }
 
-            if (action instanceof RemoveItemFromInventoryAction) {
-                RemoveItemFromInventoryAction removeItemFromInventoryAction = (RemoveItemFromInventoryAction) action;
+            if (action instanceof RemoveItemFromInventoryAction removeItemFromInventoryAction) {
                 int itemID = removeItemFromInventoryAction.getItemID();
                 if (removeItemFromInventoryAction.getAmount() == 0) {
                     for (int i = 0; i < this.inventory.length; i++) {
@@ -537,344 +480,204 @@ public class Player extends Combatant {
                     }
                 }
                 saveInventory();
-
+                this.inventoryChanged = 1;
             }
 
-            if (action instanceof AddItemToInventoryAction) {
-                AddItemToInventoryAction addItemToInventoryAction = (AddItemToInventoryAction) action;
+            if (action instanceof AddItemToInventoryAction addItemToInventoryAction) {
                 int itemID = addItemToInventoryAction.getItemID();
                 int quantity = addItemToInventoryAction.getQuantity();
                 this.addItemToInventory(itemID, quantity);
             }
 
-            if (action instanceof ForceNpcAttackPlayerAction) {
-                ForceNpcAttackPlayerAction forceNpcAttackPlayerAction = (ForceNpcAttackPlayerAction) action;
+            if (action instanceof ForceNpcAttackPlayerAction forceNpcAttackPlayerAction) {
                 Entity entity = this.world.getEntityByID(forceNpcAttackPlayerAction.getNpcID());
                 if (entity != null && entity instanceof Npc) {
-                    ((Npc) entity).targetedEntityID = this.entityID;
+                    ((Npc) entity).setTargetedEntityID(entityID);
                 }
             }
 
-            if (action instanceof BuyItemAction) {
-                BuyItemAction buyItemAction = (BuyItemAction) action;
+            if (action instanceof BuyItemAction buyItemAction) {
                 handleBuyItemAction(buyItemAction.getShopID(), buyItemAction.getItemID(),
                         buyItemAction.getAmount());
             }
 
-            if (action instanceof SellItemAction) {
-                SellItemAction sellItemAction = (SellItemAction) action;
+            if (action instanceof SellItemAction sellItemAction) {
                 handleSellItemAction(sellItemAction.getShopID(), sellItemAction.getInventoryIndex(),
                         sellItemAction.getAmount());
             }
 
-            if (action instanceof TradeMoveAction) {
-                TradeMoveAction tradeMoveAction = (TradeMoveAction) action;
+            if (action instanceof TradeMoveAction tradeMoveAction) {
                 Entity entity = this.world.getEntityByID(tradeMoveAction.getEntityID());
-                if (entity != null && entity instanceof Player) {
-                    // this.tradeWithPlayer((Player) entity); // TODO
-                } else {
-                    this.targetedEntityID = tradeMoveAction.getEntityID();
-                    this.goalAction = 3;
-                    this.newTargetTile = new TilePosition(entity.worldX, entity.worldY);
-                }
-            }
-
-            if (action instanceof CastSpellAction) {
-                CastSpellAction castSpellAction = (CastSpellAction) action;
-                this.castSpell(castSpellAction.getSpellID(), castSpellAction.getTargetID());
-            }
-        }
-    }
-
-    private void castSpell(int spellID, String targetID) {
-        if (spellCounter > 0) {
-            this.world.chatMessages.add(
-                    new ChatMessage(this.name, "You're already casting a spell!", System.currentTimeMillis(), false));
-            return;
-        }
-        Spell spell = world.spellsManager.getSpellByID(spellID);
-
-        if (spell == null) {
-            Logger.printError("Spell not found");
-            return;
-        }
-
-        int levelRequirement = spell.getLevelRequirement();
-        int playerMagicLevel = ExperienceUtils.getLevelByExp(this.skills[SkillUtils.MAGIC]);
-
-        if (playerMagicLevel < levelRequirement) {
-            this.world.chatMessages.add(
-                    new ChatMessage(this.name, "You need a magic level of " + levelRequirement + " to cast this spell.",
-                            System.currentTimeMillis(), false));
-            return;
-        }
-
-        if (spell.getType() == 1) { // Teleport spell
-            if (spell.getTargetX() == -1 || spell.getTargetY() == -1) {
-                Logger.printError("Spell target not set");
-                return;
-            }
-
-            if (teleportCounter > 0) {
-                this.world.chatMessages.add(new ChatMessage(this.name, "You are already teleporting!",
-                        System.currentTimeMillis(), false));
-                return;
-            }
-            // move to next
-            this.clearTarget();
-
-            if (this.nextTileDirection != null) {
-                moveToNextTile();
-                this.nextTileDirection = null;
-                this.currentPath = null;
-            }
-
-            SoundEvent soundEvent = new SoundEvent("teleport.wav", true, false, this.entityID, true);
-            this.world.tickSoundEvents.add(soundEvent);
-            this.teleportCounter = 10;
-            this.spellUsed = spell;
-            this.world.tickMagicEvents.add(new MagicEvent(entityID, spellID, true));
-
-            // check if anyone is targeting this player
-            for (Player player : world.players) {
-                if (player.targetedEntityID != null && player.targetedEntityID.equals(this.entityID)) {
-                    player.clearTarget();
-                }
-            }
-
-            for (Npc npc : world.npcs) {
-                if (npc.targetedEntityID != null && npc.targetedEntityID.equals(this.entityID)) {
-                    npc.clearTarget();
-                }
-            }
-        } else {
-            if (targetID == null) {
-                Logger.printError("Target not set");
-                return;
-            }
-
-            if (targetID.equals(this.entityID)) {
-                Logger.printError("Cannot cast spell on self");
-                this.world.chatMessages.add(new ChatMessage(this.name, "You cannot cast this spell on yourself.",
-                        System.currentTimeMillis(), false));
-                return;
-            }
-
-            Entity target = this.world.getEntityByID(targetID);
-
-            if (target == null) {
-                Logger.printError("Target not found");
-                return;
-            }
-
-            if (target.type == 1) {
-                this.world.chatMessages.add(new ChatMessage(this.name, "You wouldn't want to do that.",
-                        System.currentTimeMillis(), false));
-                return;
-            }
-
-            if (teleportCounter > 0) {
-                this.world.chatMessages.add(new ChatMessage(this.name, "Cannot cast while teleporting!",
-                        System.currentTimeMillis(), false));
-                return;
-            }
-
-            // face the target
-            this.facingDirection = this.getDirectionTowardsTile(target.worldX, target.worldY);
-
-            this.clearTarget();
-
-            if (this.nextTileDirection != null) {
-                moveToNextTile();
-                this.nextTileDirection = null;
-                this.currentPath = null;
-            }
-
-            if (spell.getSpellID() == 3) { // snare
-                if (target instanceof Combatant) {
-                    int distance = Math.abs(this.worldX - target.worldX) + Math.abs(this.worldY - target.worldY);
-
-                    if (distance > 7) {
-                        this.world.chatMessages.add(new ChatMessage(this.name, "The target is too far away.",
-                                System.currentTimeMillis(), false));
-                        return;
+                if (entity != null) {
+                    if (entity instanceof Player) {
+                        // this.tradeWithPlayer((Player) entity); // TODO
+                    } else {
+                        setTargetedEntityID(tradeMoveAction.getEntityID());
+                        setGoalAction(GoalAction.TRADE);
+                        setNewTargetTile(new TilePosition(entity.worldX, entity.worldY));
                     }
-
-                    this.spellUsed = spell;
-                    this.spellCounter = 4;
-                    this.spellTarget = targetID;
-                    this.world.tickMagicEvents.add(new MagicEvent(this.entityID, spellID, true));
                 }
             }
 
-            if (spell.getSpellID() == 2) {
-                if (target instanceof Combatant) {
-                    int distance = Math.abs(this.worldX - target.worldX) + Math.abs(this.worldY - target.worldY);
-
-                    if (distance > 7) {
-                        this.world.chatMessages.add(new ChatMessage(this.name, "The target is too far away.",
-                                System.currentTimeMillis(), false));
-                        return;
-                    }
-
-                    this.spellUsed = spell;
-                    this.spellCounter = 4;
-                    this.spellTarget = targetID;
-                    this.world.tickMagicEvents.add(new MagicEvent(this.entityID, spellID, true));
-                    SoundEvent soundEvent = new SoundEvent("magic_cast.wav", true, false, target.entityID, true);
-                    this.world.tickSoundEvents.add(soundEvent);
-
-                }
-            }
         }
     }
 
     private void handleSellItemAction(String shopID, int inventoryIndex, int amount) {
-        // Validate input
-        if (amount <= 0) {
-            Logger.printError("Invalid sell quantity.");
-            return;
-        }
-
-        Shop shop = world.shopsManager.getShopByID(shopID);
-        if (shop == null) {
-            Logger.printError("Shop not found");
-            return;
-        }
-
-        int itemID = this.inventory[inventoryIndex];
-        Item item = world.itemsManager.getItemByID(itemID);
-        if (itemID == 0 || item == null) {
-            Logger.printError("Item not found in inventory");
-            return;
-        }
-
-        Stock stock = shop.getStock(itemID);
-
-        if (shop.getBuysAnything() == false) {
-            if (stock == null) {
-                world.chatMessages.add(new ChatMessage(this.name, "The shop is not interested in that item.",
-                        System.currentTimeMillis(), false));
-                return;
-            }
-        }
-
-        // Check how many items the player has
-        int playerItemQuantity = 0;
-        if (item.isStackable()) {
-            for (int i = 0; i < this.inventory.length; i++) {
-                if (this.inventory[i] == itemID) {
-                    playerItemQuantity += this.inventoryAmounts[i];
-                }
-            }
-        } else {
-            for (int i = 0; i < this.inventory.length; i++) {
-                if (this.inventory[i] == itemID) {
-                    playerItemQuantity++;
-                }
-            }
-        }
-
-        // If the player does not have enough items, sell all items they have
-        if (playerItemQuantity == 0) {
-            world.addChatMessage(new ChatMessage(this.name, "You don't have any of that item to sell.",
-                    System.currentTimeMillis(), false));
-            return;
-        }
-
-        // Set amount to sell to the available quantity, if amount is more than the
-        // player has
-        if (amount > playerItemQuantity) {
-            amount = playerItemQuantity;
-        }
-
-        // Calculate the total sell price
-        int sellPrice = (int) Math.floor(item.getValue() * shop.getBuysAtPercentage());
-        long totalSellPrice = (long) sellPrice * amount;
-        if (totalSellPrice > Integer.MAX_VALUE) {
-            Logger.printError("Total price exceeds the maximum value.");
-            return;
-        }
-
-        // Deduct items from the player's inventory
-        int remainingAmount = amount;
-        if (item.isStackable()) {
-            for (int i = 0; i < this.inventory.length; i++) {
-                if (this.inventory[i] == itemID) {
-                    if (this.inventoryAmounts[i] >= remainingAmount) {
-                        this.inventoryAmounts[i] -= remainingAmount;
-                        remainingAmount = 0;
-                        if (this.inventoryAmounts[i] == 0) {
-                            this.inventory[i] = 0;
-                        }
-                        break;
-                    } else {
-                        remainingAmount -= this.inventoryAmounts[i];
-                        this.inventoryAmounts[i] = 0;
-                        this.inventory[i] = 0;
-                    }
-                }
-            }
-        } else {
-            for (int i = 0; i < this.inventory.length; i++) {
-                if (this.inventory[i] == itemID) {
-                    this.inventory[i] = 0;
-                    remainingAmount--;
-                    if (remainingAmount == 0) {
-                        break;
-                    }
-                }
-            }
-        }
-
-        if (remainingAmount > 0) {
-            Logger.printError("Error while deducting items from inventory.");
-            return;
-        }
-
-        // Add coins to the player
-        addCoins((int) totalSellPrice);
-
-        // Update the shop's stock
-        // if shop already has item on stock-> add amount to stock
-        if (stock != null) {
-            if (stock.getQuantity() + amount > Integer.MAX_VALUE) {
-                world.addChatMessage(new ChatMessage(this.name,
-                        "The shop cannot accept more of this item.", System.currentTimeMillis(), false));
-                return;
-            }
-
-            stock.setQuantity(stock.getQuantity() + amount);
-        } else {
-            // if shop does not have item on stock -> create new stock
-            // -1 means no restocking
-            Stock newStock = new Stock(itemID, amount, -1);
-            newStock.setIsDefaultStock(false);
-            shop.addStock(newStock);
-        }
-
-        // Save changes to the inventory
-        saveInventory();
+        /*
+         * // Validate input
+         * if (amount <= 0) {
+         * Logger.printError("Invalid sell quantity.");
+         * return;
+         * }
+         * 
+         * 
+         * Shop shop = world.shopsManager.getShopByID(shopID);
+         * if (shop == null) {
+         * Logger.printError("Shop not found");
+         * return;
+         * }
+         * 
+         * int itemID = this.inventory[inventoryIndex];
+         * Item item = world.itemsManager.getItemByID(itemID);
+         * if (itemID == 0 || item == null) {
+         * Logger.printError("Item not found in inventory");
+         * return;
+         * }
+         * 
+         * Stock stock = shop.getStock(itemID);
+         * 
+         * if (shop.getBuysAnything() == false) {
+         * if (stock == null) {
+         * world.chatMessages.add(new ChatMessage(this.username,
+         * "The shop is not interested in that item.",
+         * System.currentTimeMillis(), false));
+         * return;
+         * }
+         * }
+         * 
+         * // Check how many items the player has
+         * int playerItemQuantity = 0;
+         * if (item.isStackable()) {
+         * for (int i = 0; i < this.inventory.length; i++) {
+         * if (this.inventory[i] == itemID) {
+         * playerItemQuantity += this.inventoryAmounts[i];
+         * }
+         * }
+         * } else {
+         * for (int i = 0; i < this.inventory.length; i++) {
+         * if (this.inventory[i] == itemID) {
+         * playerItemQuantity++;
+         * }
+         * }
+         * }
+         * 
+         * // If the player does not have enough items, sell all items they have
+         * if (playerItemQuantity == 0) {
+         * world.addChatMessage(new ChatMessage(this.username,
+         * "You don't have any of that item to sell.",
+         * System.currentTimeMillis(), false));
+         * return;
+         * }
+         * 
+         * // Set amount to sell to the available quantity, if amount is more than the
+         * // player has
+         * if (amount > playerItemQuantity) {
+         * amount = playerItemQuantity;
+         * }
+         * 
+         * // Calculate the total sell price
+         * int sellPrice = (int) Math.floor(item.getValue() *
+         * shop.getBuysAtPercentage());
+         * long totalSellPrice = (long) sellPrice * amount;
+         * if (totalSellPrice > Integer.MAX_VALUE) {
+         * Logger.printError("Total price exceeds the maximum value.");
+         * return;
+         * }
+         * 
+         * // Deduct items from the player's inventory
+         * int remainingAmount = amount;
+         * if (item.isStackable()) {
+         * for (int i = 0; i < this.inventory.length; i++) {
+         * if (this.inventory[i] == itemID) {
+         * if (this.inventoryAmounts[i] >= remainingAmount) {
+         * this.inventoryAmounts[i] -= remainingAmount;
+         * remainingAmount = 0;
+         * if (this.inventoryAmounts[i] == 0) {
+         * this.inventory[i] = 0;
+         * }
+         * break;
+         * } else {
+         * remainingAmount -= this.inventoryAmounts[i];
+         * this.inventoryAmounts[i] = 0;
+         * this.inventory[i] = 0;
+         * }
+         * }
+         * }
+         * } else {
+         * for (int i = 0; i < this.inventory.length; i++) {
+         * if (this.inventory[i] == itemID) {
+         * this.inventory[i] = 0;
+         * remainingAmount--;
+         * if (remainingAmount == 0) {
+         * break;
+         * }
+         * }
+         * }
+         * }
+         * 
+         * if (remainingAmount > 0) {
+         * Logger.printError("Error while deducting items from inventory.");
+         * return;
+         * }
+         * 
+         * // Add coins to the player
+         * addCoins((int) totalSellPrice);
+         * 
+         * // Update the shop's stock
+         * // if shop already has item on stock-> add amount to stock
+         * if (stock != null) {
+         * if (stock.getQuantity() + amount > Integer.MAX_VALUE) {
+         * world.addChatMessage(new ChatMessage(this.username,
+         * "The shop cannot accept more of this item.", System.currentTimeMillis(),
+         * false));
+         * return;
+         * }
+         * 
+         * stock.setQuantity(stock.getQuantity() + amount);
+         * } else {
+         * // if shop does not have item on stock -> create new stock
+         * // -1 means no restocking
+         * Stock newStock = new Stock(itemID, amount, -1);
+         * newStock.setIsDefaultStock(false);
+         * shop.addStock(newStock);
+         * }
+         * 
+         * // Save changes to the inventory
+         * saveInventory();
+         */
     }
 
     private void addCoins(int totalSellPrice) {
         for (int i = 0; i < this.inventory.length; i++) {
             if (this.inventory[i] == 102) {
                 if ((long) this.inventoryAmounts[i] + totalSellPrice > Integer.MAX_VALUE) {
-                    world.chatMessages.add(new ChatMessage(this.name,
+                    world.chatMessages.add(new ChatMessage(this.username,
                             "You already have a full stack of coins.",
                             System.currentTimeMillis(), false));
                     return;
                 }
                 this.inventoryAmounts[i] += totalSellPrice;
                 saveInventory();
+                this.inventoryChanged = 1;
+                this.inventoryAmountsChanged = 1;
+
                 return;
             }
         }
 
         int emptySlot = getEmptyInventorySlot();
         if (emptySlot == -1) {
-            world.chatMessages.add(new ChatMessage(this.name,
+            world.chatMessages.add(new ChatMessage(this.username,
                     "You don't have enough space in your inventory. The coins are dropped on the ground.",
                     System.currentTimeMillis(), false));
             world.itemsManager.spawnItemWithAmount(this.worldX, this.worldY, 102, 200, totalSellPrice);
@@ -884,117 +687,129 @@ public class Player extends Combatant {
         this.inventory[emptySlot] = 102;
         this.inventoryAmounts[emptySlot] = totalSellPrice;
         saveInventory();
+        this.inventoryChanged = 1;
+        this.inventoryAmountsChanged = 1;
     }
 
     private void handleBuyItemAction(String shopID, int itemID, int amount) {
-        if (amount <= 0) {
-            Logger.printError("Invalid purchase quantity.");
-            return;
-        }
-
-        Shop shop = world.shopsManager.getShopByID(shopID);
-
-        if (shop == null) {
-            Logger.printError("Shop not found");
-            return;
-        }
-
-        Stock stock = shop.getStock(itemID);
-        if (stock == null) {
-            Logger.printError("Item not found in shop");
-            return;
-        }
-
-        int playerCoins = 0;
-
-        for (int i = 0; i < this.inventory.length; i++) {
-            if (this.inventory[i] == 102) {
-                playerCoins += this.inventoryAmounts[i];
-            }
-        }
-
-        Item item = world.itemsManager.getItemByID(itemID);
-        if (item == null) {
-            Logger.printError("Item not found in items manager, buy action failed.");
-            this.world.addChatMessage(new ChatMessage(this.name, "Item not found", System.currentTimeMillis(), false));
-            return;
-        }
-
-        int availableAmount = amount;
-        if (stock.getQuantity() < amount) {
-            if (stock.getQuantity() == 0) {
-                world.addChatMessage(new ChatMessage(this.name, "The shop is out of stock.", System.currentTimeMillis(),
-                        false));
-                return;
-            }
-            availableAmount = stock.getQuantity();
-        }
-
-        int totalPrice = (int) Math.floor(item.getValue() * shop.getSellsAtPercentage() * availableAmount);
-
-        if (totalPrice > Integer.MAX_VALUE) {
-            Logger.printError("Total price exceeds the maximum value.");
-            return;
-        }
-
-        if (playerCoins < totalPrice) {
-            world.addChatMessage(new ChatMessage(this.name, "You don't have enough coins.", System.currentTimeMillis(),
-                    false));
-            return;
-        }
-
-        if (world.itemsManager.getItemByID(itemID).isStackable() == true) {
-            boolean isItemAlreadyInInventory = false;
-            for (int i = 0; i < this.inventory.length; i++) {
-                if (this.inventory[i] == itemID) {
-                    if ((long) this.inventoryAmounts[i] + availableAmount > Integer.MAX_VALUE) {
-                        Logger.printError("Quantity exceeds maximum limit for item stack.");
-                        world.chatMessages.add(new ChatMessage(this.name,
-                                "You already have a full stack of this item.",
-                                System.currentTimeMillis(), false));
-
-                        return;
-                    }
-                    this.inventoryAmounts[i] += availableAmount;
-
-                    isItemAlreadyInInventory = true;
-                    break;
-                }
-            }
-
-            if (isItemAlreadyInInventory == false) {
-                int emptySlot = getEmptyInventorySlot();
-
-                if (emptySlot == -1) {
-                    world.chatMessages.add(new ChatMessage(this.name,
-                            "You don't have enough space in your inventory.",
-                            System.currentTimeMillis(), false));
-                    return;
-                }
-
-                this.inventory[emptySlot] = itemID;
-                this.inventoryAmounts[emptySlot] = availableAmount;
-            }
-
-        } else {
-            for (int i = 0; i < availableAmount; i++) {
-                int emptySlot = getEmptyInventorySlot();
-                if (emptySlot == -1) {
-                    world.addChatMessage(new ChatMessage(this.name, "You don't have enough space in your inventory.",
-                            System.currentTimeMillis(), false));
-                    return;
-                }
-
-                this.inventory[emptySlot] = itemID;
-            }
-        }
-
-        saveInventory();
-        stock.setQuantity(stock.getQuantity() - availableAmount);
-        if (stock.getQuantity() == 0 && stock.isDefaultStock() == false) {
-            shop.removeStock(itemID);
-        }
-        this.removeCoins(totalPrice);
+        /*
+         * if (amount <= 0) {
+         * Logger.printError("Invalid purchase quantity.");
+         * return;
+         * }
+         * 
+         * Shop shop = world.shopsManager.getShopByID(shopID);
+         * 
+         * if (shop == null) {
+         * Logger.printError("Shop not found");
+         * return;
+         * }
+         * 
+         * Stock stock = shop.getStock(itemID);
+         * if (stock == null) {
+         * Logger.printError("Item not found in shop");
+         * return;
+         * }
+         * 
+         * int playerCoins = 0;
+         * 
+         * for (int i = 0; i < this.inventory.length; i++) {
+         * if (this.inventory[i] == 102) {
+         * playerCoins += this.inventoryAmounts[i];
+         * }
+         * }
+         * 
+         * Item item = world.itemsManager.getItemByID(itemID);
+         * if (item == null) {
+         * Logger.printError("Item not found in items manager, buy action failed.");
+         * this.world.addChatMessage(
+         * new ChatMessage(this.username, "Item not found", System.currentTimeMillis(),
+         * false));
+         * return;
+         * }
+         * 
+         * int availableAmount = amount;
+         * if (stock.getQuantity() < amount) {
+         * if (stock.getQuantity() == 0) {
+         * world.addChatMessage(
+         * new ChatMessage(this.username, "The shop is out of stock.",
+         * System.currentTimeMillis(),
+         * false));
+         * return;
+         * }
+         * availableAmount = stock.getQuantity();
+         * }
+         * 
+         * int totalPrice = (int) Math.floor(item.getValue() *
+         * shop.getSellsAtPercentage() * availableAmount);
+         * 
+         * if (totalPrice > Integer.MAX_VALUE) {
+         * Logger.printError("Total price exceeds the maximum value.");
+         * return;
+         * }
+         * 
+         * if (playerCoins < totalPrice) {
+         * world.addChatMessage(
+         * new ChatMessage(this.username, "You don't have enough coins.",
+         * System.currentTimeMillis(),
+         * false));
+         * return;
+         * }
+         * 
+         * if (world.itemsManager.getItemByID(itemID).isStackable() == true) {
+         * boolean isItemAlreadyInInventory = false;
+         * for (int i = 0; i < this.inventory.length; i++) {
+         * if (this.inventory[i] == itemID) {
+         * if ((long) this.inventoryAmounts[i] + availableAmount > Integer.MAX_VALUE) {
+         * Logger.printError("Quantity exceeds maximum limit for item stack.");
+         * world.chatMessages.add(new ChatMessage(this.username,
+         * "You already have a full stack of this item.",
+         * System.currentTimeMillis(), false));
+         * 
+         * return;
+         * }
+         * this.inventoryAmounts[i] += availableAmount;
+         * isItemAlreadyInInventory = true;
+         * break;
+         * }
+         * }
+         * 
+         * if (isItemAlreadyInInventory == false) {
+         * int emptySlot = getEmptyInventorySlot();
+         * 
+         * if (emptySlot == -1) {
+         * world.chatMessages.add(new ChatMessage(this.username,
+         * "You don't have enough space in your inventory.",
+         * System.currentTimeMillis(), false));
+         * return;
+         * }
+         * 
+         * this.inventory[emptySlot] = itemID;
+         * this.inventoryAmounts[emptySlot] = availableAmount;
+         * }
+         * 
+         * } else {
+         * for (int i = 0; i < availableAmount; i++) {
+         * int emptySlot = getEmptyInventorySlot();
+         * if (emptySlot == -1) {
+         * world.addChatMessage(
+         * new ChatMessage(this.username,
+         * "You don't have enough space in your inventory.",
+         * System.currentTimeMillis(), false));
+         * return;
+         * }
+         * 
+         * this.inventory[emptySlot] = itemID;
+         * }
+         * }
+         * 
+         * saveInventory();
+         * stock.setQuantity(stock.getQuantity() - availableAmount);
+         * if (stock.getQuantity() == 0 && stock.isDefaultStock() == false) {
+         * shop.removeStock(itemID);
+         * }
+         * this.removeCoins(totalPrice);
+         */
     }
 
     private void removeCoins(int amount) {
@@ -1003,9 +818,11 @@ public class Player extends Combatant {
                 if (this.inventoryAmounts[i] >= amount) {
                     this.inventoryAmounts[i] -= amount;
                     saveInventory();
+                    this.inventoryChanged = 1;
+                    this.inventoryAmountsChanged = 1;
                     return;
                 } else {
-                    world.addChatMessage(new ChatMessage(this.name, "You don't have enough coins.",
+                    world.addChatMessage(new ChatMessage(this.username, "You don't have enough coins.",
                             System.currentTimeMillis(), false));
                 }
             }
@@ -1025,7 +842,7 @@ public class Player extends Combatant {
                 if (this.inventory[i] == itemID) {
                     if ((long) this.inventoryAmounts[i] + quantity > Integer.MAX_VALUE) {
                         Logger.printError("Quantity exceeds maximum limit for item stack.");
-                        world.chatMessages.add(new ChatMessage(this.name,
+                        world.chatMessages.add(new ChatMessage(this.username,
                                 "You already have a full stack of this item. The item is dropped on the ground.",
                                 System.currentTimeMillis(), false));
 
@@ -1043,7 +860,7 @@ public class Player extends Combatant {
 
                 if (emptySlot == -1) {
                     Logger.printError("No empty inventory slots, dropping item");
-                    world.chatMessages.add(new ChatMessage(this.name,
+                    world.chatMessages.add(new ChatMessage(this.username,
                             "You don't have enough space in your inventory. The item is dropped on the ground.",
                             System.currentTimeMillis(), false));
                     world.itemsManager.spawnItemWithAmount(this.worldX, this.worldY, itemID, 200, quantity);
@@ -1061,7 +878,7 @@ public class Player extends Combatant {
             int emptySlot = getEmptyInventorySlot();
 
             if (emptySlot == -1) {
-                world.chatMessages.add(new ChatMessage(this.name,
+                world.chatMessages.add(new ChatMessage(this.username,
                         "You don't have enough space in your inventory. The item is dropped on the ground.",
                         System.currentTimeMillis(), false));
                 world.itemsManager.spawnItem(this.worldX, this.worldY, itemID, 200);
@@ -1072,6 +889,8 @@ public class Player extends Combatant {
         }
 
         saveInventory();
+        this.inventoryChanged = 1;
+        this.inventoryAmountsChanged = 1;
     }
 
     private void eatItem(int inventoryIndex) {
@@ -1094,9 +913,9 @@ public class Player extends Combatant {
         if (item.isStackable()) {
             this.inventoryAmounts[inventoryIndex] = 0;
         }
-        this.currentHitpoints += edible.getHealAmount();
+        setCurrentHitpoints(currentHitpoints += edible.getHealAmount());
         this.world.chatMessages
-                .add(new ChatMessage(this.name, "You eat the " + item.getName() + ". " + "It heals some health.",
+                .add(new ChatMessage(this.username, "You eat the " + item.getName() + ". " + "It heals some health.",
                         System.currentTimeMillis(),
                         false));
 
@@ -1104,16 +923,16 @@ public class Player extends Combatant {
             this.currentHitpoints = ExperienceUtils.getLevelByExp(this.skills[SkillUtils.HITPOINTS]);
         }
 
-        SoundEvent soundEvent = new SoundEvent("eat.wav", true, false, this.entityID, false);
+        SoundEvent soundEvent = new SoundEvent("eat.ogg", true, false, this.entityID, false);
         this.world.tickSoundEvents.add(soundEvent);
-        this.attackTickCounter = 4;
+        setAttackTickCounter(4);
 
     }
 
     // TODO add item use functionality
     private void useItem(int itemID, int targetID) {
         this.world.chatMessages
-                .add(new ChatMessage(this.name, "Nothing interesting happens.", System.currentTimeMillis(), false));
+                .add(new ChatMessage(this.username, "Nothing interesting happens.", System.currentTimeMillis(), false));
 
     }
 
@@ -1121,7 +940,7 @@ public class Player extends Combatant {
         Item item = this.world.itemsManager.getItemByUniqueItemID(uniqueItemID);
         if (item == null) {
             this.world.chatMessages
-                    .add(new ChatMessage(this.name, "Too late, it's gone!", System.currentTimeMillis(), false));
+                    .add(new ChatMessage(this.username, "Too late, it's gone!", System.currentTimeMillis(), false));
             return;
         }
 
@@ -1130,8 +949,8 @@ public class Player extends Combatant {
             return;
         }
 
-        this.targetItemID = uniqueItemID;
-        this.newTargetTile = new TilePosition(item.getWorldX(), item.getWorldY());
+        setTargetItemID(uniqueItemID);
+        setNewTargetTile(new TilePosition(item.getWorldX(), item.getWorldY()));
     }
 
     private void questProgressUpdate(int questID, int progress) {
@@ -1144,7 +963,7 @@ public class Player extends Combatant {
         saveQuestProgress();
 
         if (progress == 100) { // 100 is the completion value
-            ChatMessage chatMessage = new ChatMessage(this.name, "Congratulations, you've completed a quest!",
+            ChatMessage chatMessage = new ChatMessage(this.username, "Congratulations, you've completed a quest!",
                     System.currentTimeMillis(), false);
 
             this.world.chatMessages.add(chatMessage);
@@ -1182,7 +1001,8 @@ public class Player extends Combatant {
                 }
 
                 saveInventory();
-
+                this.inventoryChanged = 1;
+                this.inventoryAmountsChanged = 1;
             }
 
         }
@@ -1200,9 +1020,8 @@ public class Player extends Combatant {
 
     public void saveWieldables() {
         try {
-            CommonQueries.savePlayerWieldablesByAccountId(this.accountID, this.weapon, this.shield, this.helmet,
-                    this.bodyArmor, this.legArmor, this.gloves, this.boots, this.neckwear, this.ring);
-        } catch (Exception e) {
+            CommonQueries.savePlayerWieldablesByAccountId(this.accountID, this.weapon, this.shield);
+        } catch (SQLException e) {
             Logger.printError("Failed to save weapon");
         }
     }
@@ -1219,8 +1038,13 @@ public class Player extends Combatant {
             return;
         }
 
-        if (this.weapon != null && this.weapon == inventoryIndex) {
-            this.weapon = null;
+        if (this.weapon != -1 && this.weapon == inventoryIndex) {
+            setWeapon(-1);
+            saveWieldables();
+        }
+
+        if (this.shield != -1 && this.shield == inventoryIndex) {
+            setShield(-1);
             saveWieldables();
         }
 
@@ -1240,9 +1064,11 @@ public class Player extends Combatant {
             this.world.itemsManager.spawnItem(this.worldX, this.worldY, itemID, 200);
         }
 
-        SoundEvent soundEvent = new SoundEvent("drop.wav", true, false, this.entityID, false);
+        SoundEvent soundEvent = new SoundEvent("drop.ogg", true, false, this.entityID, false);
         this.world.tickSoundEvents.add(soundEvent);
         saveInventory();
+        this.inventoryChanged = 1;
+        this.inventoryAmountsChanged = 1;
     }
 
     private void unwieldItem(int inventoryIndex) {
@@ -1264,33 +1090,10 @@ public class Player extends Combatant {
             return;
         }
 
-        if (this.weapon == inventoryIndex) {
-            this.weapon = null;
-
-        } else if (this.shield != null && this.shield == inventoryIndex) {
-            this.shield = null;
-
-        } else if (this.helmet != null && this.helmet == inventoryIndex) {
-            this.helmet = null;
-
-        } else if (this.bodyArmor != null && this.bodyArmor == inventoryIndex) {
-            this.bodyArmor = null;
-
-        } else if (this.legArmor != null && this.legArmor == inventoryIndex) {
-            this.legArmor = null;
-
-        } else if (this.gloves != null && this.gloves == inventoryIndex) {
-            this.gloves = null;
-
-        } else if (this.boots != null && this.boots == inventoryIndex) {
-            this.boots = null;
-
-        } else if (this.neckwear != null && this.neckwear == inventoryIndex) {
-            this.neckwear = null;
-
-        } else if (this.ring != null && this.ring == inventoryIndex) {
-            this.ring = null;
-
+        if (this.weapon != -1 && this.weapon == inventoryIndex) {
+            setWeapon(-1);
+        } else if (this.shield != -1 && this.shield == inventoryIndex) {
+            setShield(-1);
         } else {
             Logger.printError("Item not wielded");
             return;
@@ -1300,52 +1103,30 @@ public class Player extends Combatant {
 
     }
 
-    public int getCombatLevel() {
-        int hitpointsLevel = ExperienceUtils.getLevelByExp(skills[SkillUtils.HITPOINTS]);
-        int attackLevel = ExperienceUtils.getLevelByExp(skills[SkillUtils.ATTACK]);
-        int strengthLevel = ExperienceUtils.getLevelByExp(skills[SkillUtils.STRENGTH]);
-        int defenceLevel = ExperienceUtils.getLevelByExp(skills[SkillUtils.DEFENCE]);
-
-        double base = 0.25 * (defenceLevel + hitpointsLevel);
-        double melee = 0.325 * (attackLevel + strengthLevel);
-
-        return (int) (base + melee);
-    }
-
     private void updateCounters() {
-        if (this.snareCounter > 0) {
-            this.snareCounter--;
-        }
-        if (this.spellCounter > 0) {
-            this.spellCounter--;
-        }
 
-        if (this.teleportCounter > 0) {
-            this.teleportCounter--;
-        }
         if (this.attackTickCounter > 0) {
-            this.attackTickCounter--;
+            setAttackTickCounter(--attackTickCounter);
         }
 
         if (this.lastDamageDealtCounter > 0) {
-            this.lastDamageDealtCounter--;
-        } else {
-            this.lastDamageDealt = null;
+            setLastDamageDealtCounter(--lastDamageDealtCounter);
+        } else if (lastDamageDealt != -1) {
+            setLastDamageDealt(-1);
         }
 
         if (this.isInCombatCounter > 0) {
-            this.isInCombatCounter--;
-        } else {
-            this.isInCombat = false;
+            setIsInCombatCounter(--isInCombatCounter);
+        } else if (isInCombat != false) {
+            setIsInCombat(false);
         }
 
         if (isDying) {
-
-            this.dyingCounter++;
-            if (this.dyingCounter > 5) {
-                this.resetPlayer();
-                this.isDying = false;
-                this.dyingCounter = 0;
+            setDyingCounter(++dyingCounter);
+            if (dyingCounter > 5) {
+                resetPlayer();
+                setIsDying(false);
+                setDyingCounter(0);
             }
         }
 
@@ -1356,38 +1137,27 @@ public class Player extends Combatant {
         this.skills[SkillUtils.STRENGTH] = player.getStrengthExperience();
         this.skills[SkillUtils.DEFENCE] = player.getDefenceExperience();
         this.skills[SkillUtils.HITPOINTS] = player.getHitpointsExperience();
-        this.skills[SkillUtils.MAGIC] = player.getMagicExperience();
     }
 
     private void loadPlayerInventory(DBPlayer player) {
         this.inventory = new int[20];
         this.inventoryAmounts = new int[20];
-        for (int i = 0; i < player.getInventory().length; i++) {
-            this.inventory[i] = player.getInventory()[i];
-        }
-
-        for (int i = 0; i < player.getInventoryAmounts().length; i++) {
-            this.inventoryAmounts[i] = player.getInventoryAmounts()[i];
-        }
+        System.arraycopy(player.getInventory(), 0, this.inventory, 0, player.getInventory().length);
+        System.arraycopy(player.getInventoryAmounts(), 0, this.inventoryAmounts, 0,
+                player.getInventoryAmounts().length);
     }
 
     public void killPlayer() {
-        this.isDying = true;
-        this.nextTileDirection = null;
+        setIsDying(true);
+        stopAllMovement();
         this.world.chatMessages
-                .add(new ChatMessage(this.name, "Oh dear, you are dead!", System.currentTimeMillis(), false));
+                .add(new ChatMessage(this.username, "Oh dear, you are dead!", System.currentTimeMillis(), false));
     }
 
     public void resetPlayer() {
-        this.weapon = null;
-        this.helmet = null;
-        this.shield = null;
-        this.bodyArmor = null;
-        this.legArmor = null;
-        this.gloves = null;
-        this.boots = null;
-        this.neckwear = null;
-        this.ring = null;
+        setWeapon(-1);
+        setShield(-1);
+
         for (int i = 0; i < this.inventory.length; i++) {
             if (this.inventory[i] != 0) {
                 int amount = this.inventoryAmounts[i];
@@ -1402,22 +1172,50 @@ public class Player extends Combatant {
         }
         this.inventory = new int[20];
         this.inventoryAmounts = new int[20];
-        this.currentHitpoints = ExperienceUtils.getLevelByExp(this.skills[3]);
+        setCurrentHitpoints(ExperienceUtils.getLevelByExp(this.skills[3]));
         move(this.originalWorldX, this.originalWorldY);
-        this.targetTile = null;
-        this.newTargetTile = null;
-        this.targetedEntityID = null;
-        this.targetItemID = null;
-        this.isInCombatCounter = 0;
-        this.lastDamageDealt = null;
-        this.lastDamageDealtCounter = 0;
-        this.attackTickCounter = 0;
-        this.currentPath = null;
-        this.nextTileDirection = null;
-        this.goalAction = null;
-        this.isInCombat = false;
+        setTargetTile(null);
+        setNewTargetTile(null);
+        setTargetedEntityID(null);
+        setTargetItemID(null);
+        setIsInCombatCounter(0);
+        setLastDamageDealt(-1);
+        setLastDamageDealtCounter(0);
+        setAttackTickCounter(0);
+        setCurrentPath(null);
+        setNextTileDirection(Direction.NONE);
+        setGoalAction(null);
+        setIsInCombat(false);
+
         this.saveInventory();
+        this.inventoryChanged = 1;
+        this.inventoryAmountsChanged = 1;
         this.saveWieldables();
+    }
+
+    public void setInfluence(int influence) {
+        this.influence = influence;
+        this.influenceChanged = 1;
+    }
+
+    public void setSkinColor(int skinColor) {
+        this.skinColor = skinColor;
+        this.skinColorChanged = 1;
+    }
+
+    public void setHairColor(int hairColor) {
+        this.hairColor = hairColor;
+        this.hairColorChanged = 1;
+    }
+
+    public void setShirtColor(int shirtColor) {
+        this.shirtColor = shirtColor;
+        this.shirtColorChanged = 1;
+    }
+
+    public void setPantsColor(int pantsColor) {
+        this.pantsColor = pantsColor;
+        this.pantsColorChanged = 1;
     }
 
 }

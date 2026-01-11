@@ -1,12 +1,5 @@
 package com.g8e.registerServer;
 
-import com.google.gson.Gson;
-import com.sun.net.httpserver.HttpServer;
-
-import at.favre.lib.crypto.bcrypt.BCrypt;
-
-import com.sun.net.httpserver.HttpExchange;
-
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
@@ -18,6 +11,11 @@ import com.g8e.db.DatabaseConnection;
 import com.g8e.registerServer.models.RegistrationRequest;
 import com.g8e.registerServer.models.RegistrationResponse;
 import com.g8e.util.Logger;
+import com.google.gson.Gson;
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpServer;
+
+import at.favre.lib.crypto.bcrypt.BCrypt;
 
 public class RegisterServer {
     private static final int PORT = 8000;
@@ -109,8 +107,8 @@ public class RegisterServer {
         String SQL_INSERT_PLAYER = "INSERT INTO players "
                 + "(account_id, skin_color, hair_color, shirt_color, pants_color, world_x, world_y, weapon, inventory, inventoryAmounts, "
                 + "quest_progress, attack_experience, defence_experience, "
-                + "strength_experience, hitpoints_experience, magic_experience) "
-                + "VALUES (?, 0, 0, 0, 0, 0, 0, null, ?, ?, ?, 0, 0, 0, 1200, 0)";
+                + "strength_experience, hitpoints_experience) "
+                + "VALUES (?, 0, 0, 0, 0, 0, 0, null, ?, ?, ?, 0, 0, 0, 1200)";
 
         try (Connection connection = DatabaseConnection.createDatabaseConnection();
                 var statement = connection.prepareStatement(SQL_INSERT_PLAYER)) {
@@ -119,8 +117,7 @@ public class RegisterServer {
             int[] inventoryAmounts = new int[20];
             int[] questProgress = new int[5];
 
-            inventory[0] = 102;
-            inventoryAmounts[0] = 150;
+            inventory[0] = 100;
 
             statement.setString(2, gson.toJson(inventory));
             statement.setString(3, gson.toJson(inventoryAmounts));

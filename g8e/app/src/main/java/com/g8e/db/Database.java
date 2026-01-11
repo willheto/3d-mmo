@@ -3,14 +3,13 @@ package com.g8e.db;
 import java.sql.Connection;
 import java.sql.SQLException;
 
-import com.g8e.util.Logger;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 
 import io.github.cdimascio.dotenv.Dotenv;
 
 public class Database {
-    private static HikariDataSource dataSource;
+    final private static HikariDataSource dataSource;
 
     static {
         Dotenv dotenv = Dotenv.load();

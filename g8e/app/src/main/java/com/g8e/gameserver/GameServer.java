@@ -6,9 +6,11 @@ import java.io.InputStreamReader;
 import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.Map;
+
 import org.java_websocket.WebSocket;
 import org.java_websocket.handshake.ClientHandshake;
 import org.java_websocket.server.WebSocketServer;
+
 import com.g8e.gameserver.network.WebSocketEventsHandler;
 import com.g8e.util.Logger;
 
@@ -30,7 +32,7 @@ public class GameServer extends WebSocketServer {
             start();
             world.start();
             handleConsoleInput();
-        } catch (Exception e) {
+        } catch (IOException | InterruptedException e) {
             e.printStackTrace();
         }
     }

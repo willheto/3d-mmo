@@ -1,41 +1,55 @@
-export class ExperienceCurve {
-	/**
-	 * Calculates the total experience required to reach a given level.
-	 *
-	 * @param level The target level (must be >= 1)
-	 * @return The total experience required
-	 */
-	public static getExperienceForLevel(level: number): number {
-		if (level < 1) {
-			throw new Error('Level must be at least 1');
+export class ExperienceUtils {
+	private static readonly levelExperience: number[] = (() => {
+		const arr: number[] = new Array(99);
+		let acc = 0;
+
+		for (let i = 0; i < 99; i++) {
+			const level = i + 1;
+			const delta = Math.floor(level + Math.pow(2.0, level / 7.0) * 300.0);
+			acc += delta;
+			arr[i] = Math.floor(acc / 4.0);
 		}
-		return level ** 3; // EXP = n^3
+
+		return arr;
+	})();
+
+	static getLevelByExp(exp: number): number {
+		for (let i = 98; i >= 0; i--) {
+			if (exp >= this.levelExperience[i]) {
+				return Math.min(i + 2, 99);
+			}
+		}
+		return 1;
 	}
 
-	/**
-	 * Calculates the level corresponding to a given experience amount.
-	 *
-	 * @param experience The total experience
-	 * @return The corresponding level
-	 */
-	public static getLevelByExperience(experience: number): number {
-		if (experience < 0) {
-			throw new Error('Experience cannot be negative');
+	static getExpForLevel(level: number): number {
+		if (level < 1 || level > 99) {
+			throw new Error('Level must be between 1 and 99.');
 		}
-		return Math.cbrt(experience) | 0; // Level = cubic root of EXP, floored
+		if (level === 1) return 0;
+		return this.levelExperience[level - 2];
 	}
 
-	/**
-	 * Calculates the experience required to reach the next level from the current level.
-	 *
-	 * @param level The current level (must be >= 1)
-	 * @return The experience required to reach the next level
-	 */
-	public static getExperienceToNextLevel(level: number): number {
-		if (level < 1) {
-			throw new Error('Level must be at least 1');
+	static calculateExperienceDifference(level: number): number {
+		if (level < 2) {
+			throw new Error('Level must be 2 or higher.');
 		}
-		// Experience required for the next level
-		return this.getExperienceForLevel(level + 1) - this.getExperienceForLevel(level);
+		const exponentPart = Math.pow(2.0, (level - 1) / 7.0);
+		const expressionValue = level - 1 + 300 * exponentPart;
+		return Math.floor(expressionValue / 4);
+	}
+
+	static getExperienceUntilNextLevel(experience: number): number {
+		const currentLevel = this.getLevelByExp(experience);
+		const nextLevel = this.getExpForLevel(currentLevel + 1);
+
+		return nextLevel - experience;
+
+		if (currentLevel >= 99) return 0;
+
+		const currentLevelDelta = this.calculateExperienceDifference(currentLevel);
+		const nextLevelDelta = this.calculateExperienceDifference(currentLevel + 1);
+
+		return nextLevelDelta - (experience - currentLevelDelta);
 	}
 }

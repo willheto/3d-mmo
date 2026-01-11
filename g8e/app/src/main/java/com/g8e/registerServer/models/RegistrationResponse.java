@@ -1,7 +1,7 @@
 package com.g8e.registerServer.models;
 
 public class RegistrationResponse {
-    private boolean success;
+    final private boolean success;
     private String error;
 
     public RegistrationResponse(boolean success) {

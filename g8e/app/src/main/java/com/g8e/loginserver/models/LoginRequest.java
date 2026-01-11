@@ -1,7 +1,6 @@
 package com.g8e.loginserver.models;
 
 public class LoginRequest {
-
     private int type;
     private int world;
     private String username;
@@ -22,5 +21,4 @@ public class LoginRequest {
     public String getPassword() {
         return password;
     }
-
 }

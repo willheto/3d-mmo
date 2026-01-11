@@ -10,7 +10,6 @@ public class SkillUtils {
     public static final int STRENGTH = 1;
     public static final int DEFENCE = 2;
     public static final int HITPOINTS = 3;
-    public static final int MAGIC = 4;
 
     // Maps for name-to-number and number-to-name lookups
     private static final Map<String, Integer> NAME_TO_NUMBER_MAP = new HashMap<>();
@@ -22,7 +21,6 @@ public class SkillUtils {
         NAME_TO_NUMBER_MAP.put("strength", STRENGTH);
         NAME_TO_NUMBER_MAP.put("defence", DEFENCE);
         NAME_TO_NUMBER_MAP.put("hitpoints", HITPOINTS);
-        NAME_TO_NUMBER_MAP.put("magic", MAGIC);
 
         // Populate the reverse map
         for (Map.Entry<String, Integer> entry : NAME_TO_NUMBER_MAP.entrySet()) {

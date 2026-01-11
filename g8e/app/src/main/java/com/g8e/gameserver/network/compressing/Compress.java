@@ -5,6 +5,8 @@ import java.io.IOException;
 import java.util.zip.Deflater;
 import java.util.zip.DeflaterOutputStream;
 
+import com.g8e.util.Logger;
+
 public class Compress {
     public static byte[] compress(String data) {
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -13,7 +15,7 @@ public class Compress {
             dos.close();
             return baos.toByteArray();
         } catch (IOException e) {
-            e.printStackTrace();
+            Logger.printError(e.getMessage());
             return null;
         }
     }

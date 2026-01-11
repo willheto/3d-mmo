@@ -19,8 +19,8 @@ export default class Man extends Interaction {
 
 		switch (dialogue) {
 			case 1:
-				await this.npcSays("Not too bad, but I'm a little worried about the increase of goblins these days.");
-				await this.npcSays("Don't worry, I'll kill them.");
+				await this.npcSays("I'm a little worried about the increase of goblins these days.");
+				await this.playerSays("Don't worry, I'll kill them.");
 				break;
 
 			case 2:
@@ -48,7 +48,7 @@ export default class Man extends Interaction {
 
 			case 4:
 				await this.npcSays("I'm fine, how are you?");
-				await this.npcSays('Very well thank you.');
+				await this.playerSays('Very well thank you.');
 				break;
 
 			case 5:
@@ -61,7 +61,7 @@ export default class Man extends Interaction {
 
 			case 7:
 				await this.npcSays('Who are you?');
-				await this.npcSays("I'm a bold adventurer.");
+				await this.playerSays("I'm a bold adventurer.");
 				await this.npcSays('Ah, a very noble profession.');
 				break;
 

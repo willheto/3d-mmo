@@ -2,6 +2,7 @@ package com.g8e.db.migrations;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.SQLException;
 
 import com.g8e.util.Logger;
 
@@ -30,22 +31,14 @@ public class V1_init {
             + "world_x INT,"
             + "world_y INT,"
             + "weapon INT,"
-            + "helmet INT,"
             + "shield INT,"
-            + "body_armor INT,"
-            + "leg_armor INT,"
-            + "gloves INT,"
-            + "boots INT,"
-            + "neckwear INT,"
-            + "ring INT,"
             + "inventory JSON,"
             + "inventoryAmounts JSON,"
             + "quest_progress JSON,"
             + "attack_experience INT,"
             + "defence_experience INT,"
             + "strength_experience INT,"
-            + "hitpoints_experience INT,"
-            + "magic_experience INT"
+            + "hitpoints_experience INT"
             + ");";
 
     public void up() {
@@ -58,7 +51,7 @@ public class V1_init {
             connection.createStatement().executeUpdate(createPlayersTable);
             Logger.printInfo("Created players table");
 
-        } catch (Exception e) {
+        } catch (SQLException e) {
             e.printStackTrace();
         }
     }
@@ -73,7 +66,7 @@ public class V1_init {
             connection.createStatement().executeUpdate("DROP TABLE IF EXISTS accounts;");
             Logger.printInfo("Dropped accounts table");
 
-        } catch (Exception e) {
+        } catch (SQLException e) {
             e.printStackTrace();
         }
     }

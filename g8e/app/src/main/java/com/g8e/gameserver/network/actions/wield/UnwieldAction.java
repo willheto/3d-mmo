@@ -3,8 +3,7 @@ package com.g8e.gameserver.network.actions.wield;
 import com.g8e.gameserver.network.actions.Action;
 
 public class UnwieldAction extends Action {
-
-    private UnwieldActionData data;
+    final private UnwieldActionData data;
 
     public UnwieldAction(String playerID, UnwieldActionData data) {
         this.action = "unwield";

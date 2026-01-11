@@ -60,6 +60,66 @@ export class Actions {
 		);
 	}
 
+	public changeAttackStyle(playerID: string, attackStyle: string): void {
+		this.gameSocket?.send(
+			JSON.stringify({
+				action: 'changeAttackStyle',
+				playerID: playerID,
+				data: {
+					attackStyle: attackStyle,
+				},
+			}),
+		);
+	}
+
+	public wield(playerID: string, inventoryIndex: number): void {
+		this.gameSocket?.send(
+			JSON.stringify({
+				action: 'wieldItem',
+				playerID: playerID,
+				data: {
+					inventoryIndex: inventoryIndex,
+				},
+			}),
+		);
+	}
+
+	public unWield(playerID: string, inventoryIndex: number): void {
+		this.gameSocket?.send(
+			JSON.stringify({
+				action: 'unwieldItem',
+				playerID: playerID,
+				data: {
+					inventoryIndex: inventoryIndex,
+				},
+			}),
+		);
+	}
+
+	public dropItem(playerID: string, inventoryIndex: number): void {
+		this.gameSocket?.send(
+			JSON.stringify({
+				action: 'dropItem',
+				playerID: playerID,
+				data: {
+					inventoryIndex: inventoryIndex,
+				},
+			}),
+		);
+	}
+
+	public takeGroundItem(playerID: string, uniqueItemID: string): void {
+		this.gameSocket?.send(
+			JSON.stringify({
+				action: 'playerTakeMove',
+				playerID: playerID,
+				data: {
+					uniqueItemID: uniqueItemID,
+				},
+			}),
+		);
+	}
+
 	public logOut(playerID: string): void {
 		//
 	}

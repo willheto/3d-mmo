@@ -1,17 +1,17 @@
 interface SocketGameState {
-	tickTalkEvents: SocketTalkEvent[];
-	tickSoundEvents: SocketSoundEvent[];
-	tickAttackEvents: SocketAttackEvent[];
+	tickTalkEvents?: SocketTalkEvent[];
+	tickSoundEvents?: SocketSoundEvent[];
+	tickAttackEvents?: SocketAttackEvent[];
 
-	players: SocketPlayer[];
-	npcs: SocketNpc[];
+	players?: SocketPlayer[];
+	npcs?: SocketNpc[];
 
-	chatMessages: SocketChatMessage[];
-	items: SocketItem[];
-	shops: SocketShop[];
+	chatMessages?: SocketChatMessage[];
+	items?: SocketItem[];
+	shops?: SocketShop[];
 
-	playerID: string;
-	onlinePlayers: string[];
+	playerID?: string;
+	onlinePlayers?: string[];
 }
 
 interface SocketTalkEvent {
@@ -35,26 +35,40 @@ interface SocketSoundEvent {
 }
 
 interface SocketNpc extends SocketEntity {
-	entityIndex: number;
+	npcIndex: number;
 }
 
 interface SocketPlayer extends SocketEntity {
-	name: string;
 	storyProgress: number;
 	inventory: number[];
 	inventoryAmounts: number[];
+	skills: number[];
+	attackStyle: string;
+	username: string;
 }
+
+type Direction = 'UP' | 'DOWN' | 'LEFT' | 'RIGHT' | 'NONE';
 
 interface SocketEntity {
 	entityID: string;
 	worldX: number;
 	worldY: number;
-	nextTileDirection: Direction | null;
+	nextTileDirection: Direction;
 	facingDirection: Direction;
 	currentChunk: number;
 	currentHitpoints: number;
 	isInCombat: boolean;
 	isDying: boolean;
+
+	weapon: undefined | number;
+	helmet: undefined | number;
+	shield: undefined | number;
+	bodyArmor: undefined | number;
+	legArmor: undefined | number;
+	gloves: undefined | number;
+	boots: undefined | number;
+	neckwear: undefined | number;
+	ring: undefined | number;
 }
 
 interface SocketChatMessage {
@@ -73,6 +87,7 @@ interface SocketItem {
 	value: number;
 	isStackable: boolean;
 	amount: number;
+	uniqueID: string;
 	worldX: number | null;
 	worldY: number | null;
 }

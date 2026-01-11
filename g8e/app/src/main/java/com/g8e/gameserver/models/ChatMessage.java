@@ -1,10 +1,10 @@
 package com.g8e.gameserver.models;
 
 public class ChatMessage {
-    private String senderName;
-    private String message;
-    private long timeSent;
-    private boolean isGlobal;
+    private final String senderName;
+    private final String message;
+    private final long timeSent;
+    private final boolean isGlobal;
 
     public ChatMessage(String senderName, String message, long timeSent, boolean isGlobal) {
         this.senderName = senderName;
