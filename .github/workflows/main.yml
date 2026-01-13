@@ -18,10 +18,13 @@ jobs:
               with:
                   node-version: ${{ matrix.node-version }}
 
-            - run: npm install
+            - name: Install dependencies
+              working-directory: client
+              run: npm install
 
-            - name: build-prod
+            - name: Build production
               if: github.ref == 'refs/heads/master'
+              working-directory: client
               run: npm run build-production
 
             - name: Install sshpass
