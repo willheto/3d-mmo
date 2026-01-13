@@ -19,7 +19,7 @@ jobs:
               uses: actions/setup-node@v2
               with:
                   node-version: ${{ matrix.node-version }}
-                  
+
             - name: Install dependencies
               working-directory: client
               run: npm install
@@ -34,8 +34,8 @@ jobs:
 
             - name: Remove old build artifacts
               run: |
-                  sshpass -p 2222 '${{ secrets.SERVER_PASSWORD }}' ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_IP }} 'sudo rm -rf /var/www/game-client/*'
+                  sshpass -p '${{ secrets.SERVER_PASSWORD }}' ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_IP }} 'sudo rm -rf /var/www/game-client/*'
 
             - name: Transfer Build Artifacts
               run: |
-                  sshpass -p 2222 '${{ secrets.SERVER_PASSWORD }}' scp -o StrictHostKeyChecking=no -r dist/* ${{ secrets.SERVER_IP }}:/var/www/game-client
+                  sshpass -p '${{ secrets.SERVER_PASSWORD }}' scp -o StrictHostKeyChecking=no -r dist/* ${{ secrets.SERVER_IP }}:/var/www/game-client
