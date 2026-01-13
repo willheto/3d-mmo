@@ -126,7 +126,6 @@ public abstract class Combatant extends Entity {
             switch (entity) {
                 case Npc npc -> {
                     npc.setIsDying(true);
-                    Logger.printDebug("isDying");
                     SoundEvent soundEvent = new SoundEvent("man_death.ogg", true, false, this.entityID, true);
                     this.world.tickSoundEvents.add(soundEvent);
                     npc.setNextTileDirection(Direction.NONE);

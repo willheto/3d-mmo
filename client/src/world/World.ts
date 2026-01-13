@@ -14,6 +14,8 @@ import { Hud } from './Hud';
 import ItemsManager from '../managers/ItemsManager';
 import { ItemPreviewRenderer } from '../graphics/ItemPreviewRenderer';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
+import { Item } from '../item/Item';
+import { ItemRenderer } from './ItemRenderer';
 
 export class World {
 	public gameSocket: WebSocket | null = null;
@@ -43,7 +45,6 @@ export class World {
 
 	public groundGroups: THREE.Group[] = [];
 	public groundGroup = new THREE.Group();
-	private groundItemIcons = new Map<string, HTMLCanvasElement>();
 
 	public mouseDown: boolean;
 	public mouseButton: number;
@@ -53,13 +54,12 @@ export class World {
 	public mouseTileY: number;
 
 	public currentPlayerID: string = '';
-
-	public modalJustClosed: boolean = false;
-
+	public itemRenderer: ItemRenderer;
 	public chatMessages: SocketChatMessage[] = [];
 	public players: Player[] = [];
 	public npcs: Npc[] = [];
-	public items: SocketItem[] = [];
+	public items: Item[] = [];
+
 	public currentPlayer: Player | null = null;
 
 	public eventListenersManager: EventListenersManager = new EventListenersManager();
@@ -87,6 +87,7 @@ export class World {
 	private uiCtx!: CanvasRenderingContext2D;
 	private loadingProgress = 0;
 	private loadingMessage = 'Loading...';
+	public showDebug: boolean = true;
 
 	private prepareCanvasForRenderer(): HTMLCanvasElement {
 		const oldCanvas = document.getElementById('viewport')!;
@@ -169,6 +170,8 @@ export class World {
 
 		// Events
 		this.onPointerDown = this.onPointerDown.bind(this);
+
+		this.itemRenderer = new ItemRenderer(this);
 	}
 
 	private drawLoadingBar(progress: number, message: string) {
@@ -205,6 +208,7 @@ export class World {
 		this.running = true;
 
 		this.inputTracker.start();
+		this.tileManager.init();
 
 		document.addEventListener('pointerdown', e => {
 			this.mouseDown = true;
@@ -283,38 +287,6 @@ export class World {
 		};
 	}
 
-	private drawGroundItems(): void {
-		const ctx = canvas2d;
-
-		for (const item of this.items) {
-			if (item.worldX == null || item.worldY == null) continue;
-
-			const itemData = this.itemsManager.getItemInfoById(item.itemID);
-			if (!itemData) continue;
-
-			// World position (slightly above ground)
-			const worldPos = new THREE.Vector3(item.worldX, 0.15, item.worldY);
-
-			const screen = this.worldToScreen(worldPos);
-			if (!screen) continue;
-
-			const iconKey = itemData.modelName;
-
-			if (!this.groundItemIcons.has(iconKey)) {
-				this.itemPreviewRenderer.getIcon(iconKey).then(icon => {
-					this.groundItemIcons.set(iconKey, icon);
-				});
-				continue;
-			}
-
-			const icon = this.groundItemIcons.get(iconKey)!;
-
-			const x = screen.x - 20;
-			const y = screen.y - 80;
-			ctx.drawImage(icon, x, y);
-		}
-	}
-
 	update(dt: number) {
 		canvas2d.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -327,13 +299,15 @@ export class World {
 			return;
 		}
 
-		this.drawGroundItems();
 		this.chat.drawChat();
 		this.hud.drawHud();
+		this.itemRenderer.update();
 
 		Draw2D.drawModal(this);
 		this.playSoundEvents();
-		this.drawDebug(this.client.renderFps);
+		if (this.showDebug === true) {
+			this.drawDebug(this.client.renderFps);
+		}
 	}
 
 	private drawDebug(fps: number): void {
@@ -420,49 +394,48 @@ export class World {
 		this.npcs.forEach(npc => npc.drawNpc(dt));
 	}
 
-	private onGroundItemClick(item: SocketItem) {
-		if (this.modalJustClosed) return;
-
-		const itemData = this.itemsManager.getItemInfoById(item.itemID);
-		if (!itemData) return;
-
+	private onGroundItemsClick(items: Item[]) {
 		this.modalObject = {
 			modalX: this.mouseScreenX + 8,
 			modalY: this.mouseScreenY + 8,
 			modalOptions: [],
 		};
 
-		this.modalObject.modalOptions.push({
-			optionText: 'Take ',
-			optionSecondaryText: {
-				text: itemData.name,
-				color: '#ffff66',
-			},
-			optionFunction: () => {
-				this.actions?.takeGroundItem(this.currentPlayerID, item.uniqueID);
-				this.modalObject = null;
-			},
-		});
+		for (const item of items) {
+			const itemData = this.itemsManager.getItemInfoById(item.itemID);
+			if (!itemData) continue;
 
-		this.modalObject.modalOptions.push({
-			optionText: 'Examine ',
-			optionSecondaryText: {
-				text: itemData.name,
-				color: '#ffff66',
-			},
-			optionFunction: () => {
-				this.actions?.sendChatMessage(this.currentPlayerID, itemData.examine || 'Nothing interesting.', false);
-			},
-		});
+			this.modalObject.modalOptions.push({
+				optionText: 'Take ',
+				optionSecondaryText: {
+					text: itemData.name,
+					color: '#ffff66',
+				},
+				optionFunction: () => {
+					this.actions?.takeGroundItem(this.currentPlayerID, item.uniqueID);
+					this.modalObject = null;
+				},
+			});
+
+			this.modalObject.modalOptions.push({
+				optionText: 'Examine ',
+				optionSecondaryText: {
+					text: itemData.name,
+					color: '#ffff66',
+				},
+				optionFunction: () => {
+					this.actions?.sendChatMessage(
+						this.currentPlayerID,
+						itemData.examine || 'Nothing interesting.',
+						false,
+					);
+				},
+			});
+		}
 	}
 
-	private getItemAtTile(tx: number, ty: number): SocketItem | null {
-		for (const item of this.items) {
-			if (item.worldX === tx && item.worldY === ty) {
-				return item;
-			}
-		}
-		return null;
+	private getItemsAtTile(tx: number, ty: number): Item[] {
+		return this.items.filter(item => item.worldX === tx && item.worldY === ty);
 	}
 
 	private updateMouseTileFromRay(raycaster: THREE.Raycaster): boolean {
@@ -480,6 +453,18 @@ export class World {
 	}
 
 	private onPointerDown(e: PointerEvent) {
+		if (
+			this.modalObject &&
+			!(
+				this.mouseScreenX < this.modalObject.modalX - 10 ||
+				this.mouseScreenX > this.modalObject.modalX + this.modalObject.modalWidth + 10 ||
+				this.mouseScreenY < this.modalObject.modalY - 10 ||
+				this.mouseScreenY > this.modalObject.modalY + this.modalObject.modalHeight + 10
+			)
+		) {
+			return;
+		}
+
 		// Over UI
 		if (this.mouseScreenY > 520) {
 			return;
@@ -491,6 +476,9 @@ export class World {
 		currentPlayer.raycaster.setFromCamera(currentPlayer.mouseNdc, this.camera);
 
 		if (e.button === 2) {
+			const raycaster = currentPlayer.raycaster;
+
+			// --- NPC meshes ---
 			const npcMeshes = this.npcs.flatMap(npc => {
 				const meshes: THREE.Mesh[] = [];
 				npc.model.traverse(obj => {
@@ -499,26 +487,34 @@ export class World {
 				return meshes;
 			});
 
-			const npcHits = currentPlayer.raycaster.intersectObjects(npcMeshes, false);
-			if (npcHits.length) {
-				const npc = npcHits[0].object.userData.npc as Npc;
-				npc.onClick();
+			// --- Player meshes ---
+			const playerMeshes = this.players.flatMap(player => {
+				const meshes: THREE.Mesh[] = [];
+				player.model.traverse(obj => {
+					if (obj instanceof THREE.Mesh) meshes.push(obj);
+				});
+				return meshes;
+			});
+
+			// Raycast once
+			const hits = raycaster.intersectObjects([...npcMeshes, ...playerMeshes], false);
+
+			// Collect entities
+			const npcs = this.collectNpcHits(hits);
+			const players = this.collectPlayerHits(hits);
+
+			// Tile lookup (items)
+			let items: Item[] = [];
+			if (this.updateMouseTileFromRay(raycaster)) {
+				items = this.getItemsAtTile(this.mouseTileX, this.mouseTileY);
+			}
+
+			// Nothing clicked
+			if (!npcs.length && !players.length && !items.length) {
 				return;
 			}
 
-			if (!this.updateMouseTileFromRay(currentPlayer.raycaster)) {
-				return;
-			}
-
-			const tx = this.mouseTileX;
-			const ty = this.mouseTileY;
-
-			const item = this.getItemAtTile(tx, ty);
-			if (item) {
-				this.onGroundItemClick(item);
-				return;
-			}
-
+			this.openStackedClickModal({ npcs, players, items });
 			return;
 		} else {
 			const groundHits = currentPlayer.raycaster.intersectObjects(
@@ -538,5 +534,140 @@ export class World {
 			this.marker.position.set(tx, y + 0.02, tz);
 			this.marker.visible = true;
 		}
+	}
+
+	private openStackedClickModal(data: { npcs: Npc[]; players: Player[]; items: Item[] }) {
+		this.modalObject = {
+			modalX: this.mouseScreenX + 8,
+			modalY: this.mouseScreenY + 8,
+			modalOptions: [],
+		};
+
+		// --- NPCs ---
+		for (const npc of data.npcs) {
+			const npcData = this.entitiesManager.getEntityInfoByIndex(npc.entityIndex);
+			if (!npcData) continue;
+
+			if (npcData.isTalkable) {
+				this.modalObject.modalOptions.push({
+					optionText: 'Talk-to ',
+					optionSecondaryText: {
+						text: npcData.name + ` (Level-${npc.getCombatLevel()})`,
+						color: '#ffff66',
+					},
+					optionFunction: () => {
+						this.actions?.moveAndTalk(this.currentPlayerID, npc.entityID);
+						this.modalObject = null;
+					},
+				});
+			}
+
+			if (npcData.type === 2) {
+				this.modalObject.modalOptions.push({
+					optionText: 'Attack ',
+					optionSecondaryText: {
+						text: npcData.name + ` (Level-${npc.getCombatLevel()})`,
+						color: '#ffff66',
+					},
+					optionFunction: () => {
+						this.actions?.moveAndAttack(this.currentPlayerID, npc.entityID);
+						this.modalObject = null;
+					},
+				});
+			}
+
+			this.modalObject.modalOptions.push({
+				optionText: 'Examine ',
+				optionSecondaryText: {
+					text: npcData.name + ` (Level-${npc.getCombatLevel()})`,
+					color: '#ffff66',
+				},
+				optionFunction: () => {
+					this.actions?.sendChatMessage(this.currentPlayerID, npcData.examine || 'No data', false);
+				},
+			});
+		}
+
+		for (const player of data.players) {
+			this.modalObject.modalOptions.push({
+				optionText: 'Attack ',
+				optionSecondaryText: {
+					text: player.name + ` (Level-${player.getCombatLevel()})`,
+					color: '#ffff66',
+				},
+				optionFunction: () => {
+					this.actions?.moveAndAttack(this.currentPlayerID, player.entityID);
+					this.modalObject = null;
+				},
+			});
+
+			this.modalObject.modalOptions.push({
+				optionText: 'Examine ',
+				optionSecondaryText: {
+					text: player.name + ` (Level-${player.getCombatLevel()})`,
+					color: '#ffff66',
+				},
+				optionFunction: () => {
+					this.actions?.sendChatMessage(this.currentPlayerID, 'Nothing interesting.', false);
+				},
+			});
+		}
+
+		// --- Items ---
+		for (const item of data.items) {
+			const itemData = this.itemsManager.getItemInfoById(item.itemID);
+			if (!itemData) continue;
+
+			this.modalObject.modalOptions.push({
+				optionText: 'Take ',
+				optionSecondaryText: {
+					text: itemData.name,
+					color: '#ffff66',
+				},
+				optionFunction: () => {
+					this.actions?.takeGroundItem(this.currentPlayerID, item.uniqueID);
+					this.modalObject = null;
+				},
+			});
+
+			this.modalObject.modalOptions.push({
+				optionText: 'Examine ',
+				optionSecondaryText: {
+					text: itemData.name,
+					color: '#ffff66',
+				},
+				optionFunction: () => {
+					this.actions?.sendChatMessage(
+						this.currentPlayerID,
+						itemData.examine || 'Nothing interesting.',
+						false,
+					);
+				},
+			});
+		}
+	}
+
+	private collectPlayerHits(hits: THREE.Intersection[]): Player[] {
+		const set = new Set<Player>();
+
+		for (const hit of hits) {
+			const player = hit.object.userData.player as Player | undefined;
+			if (player && player.entityID !== this.currentPlayerID) {
+				set.add(player);
+			}
+		}
+
+		return Array.from(set);
+	}
+
+	private collectNpcHits(hits: THREE.Intersection[]): Npc[] {
+		const set = new Set<Npc>();
+
+		for (const hit of hits) {
+			const npc = hit.object.userData.npc as Npc | undefined;
+			if (npc) set.add(npc);
+		}
+
+		return Array.from(set);
 	}
 }

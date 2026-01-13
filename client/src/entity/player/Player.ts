@@ -23,7 +23,7 @@ export default class Player extends Entity {
 			this.model.traverse(obj => {
 				if ((obj as THREE.Mesh).isMesh) {
 					obj.userData.type = 'player';
-					obj.userData.npc = this;
+					obj.userData.player = this;
 				}
 			});
 		}
@@ -56,25 +56,23 @@ export default class Player extends Entity {
 		if (player.isInCombat !== undefined) this.isInCombat = player.isInCombat;
 		if (player.skills !== undefined) this.skills = player.skills;
 
-		if (player.weapon) {
+		if (player.weapon !== undefined) {
 			if (player.weapon === -1) {
 				this.removeWeapon();
 				this.weapon = player.weapon || -1;
-			}
-
-			if (player.weapon > 0) {
-				const itemIndex = player.inventory[player.weapon];
+			} else {
+				const itemIndex = this.inventory[player.weapon];
 				this.loadWieldable(itemIndex);
 				this.weapon = player.weapon;
 			}
 		}
 
-		if (player.shield) {
+		if (player.shield !== undefined) {
 			if (player.shield === -1) {
 				this.removeShield();
 				this.shield = player.shield || -1;
 			} else {
-				const itemIndex = player.inventory[player.shield];
+				const itemIndex = this.inventory[player.shield];
 				this.loadWieldable(itemIndex);
 				this.shield = player.shield;
 			}
@@ -157,9 +155,7 @@ export default class Player extends Entity {
 			return;
 		}
 
-		const playerAttackEvents = this.world.attackEvents.filter(
-			event => event.attackerID === this.world.currentPlayerID,
-		);
+		const playerAttackEvents = this.world.attackEvents.filter(event => event.attackerID === this.entityID);
 
 		if (playerAttackEvents.length > 0 && this.attackTimer <= 0) {
 			this.attackTimer = this.ATTACK_DURATION;

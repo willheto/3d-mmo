@@ -4,8 +4,8 @@ import com.g8e.gameserver.network.actions.Action;
 
 public class RemoveItemFromInventoryAction extends Action {
 
-    private int itemID;
-    private int amount;
+    private final int itemID;
+    private final int amount;
 
     public RemoveItemFromInventoryAction(String playerID, int itemID, int amount) {
         this.action = "removeItemFromInventory";

@@ -39,10 +39,7 @@ public class RegisterServer {
 
             try {
                 validateRegistrationRequest(request, exchange);
-            } catch (IOException e) {
-                sendResponse(exchange, 400, new RegistrationResponse(false, e.getMessage()));
-                return;
-            } catch (IllegalArgumentException e) {
+            } catch (IOException | IllegalArgumentException e) {
                 sendResponse(exchange, 400, new RegistrationResponse(false, e.getMessage()));
                 return;
             }
@@ -105,16 +102,16 @@ public class RegisterServer {
 
     private void createPlayer(int accountID, HttpExchange exchange) throws IOException {
         String SQL_INSERT_PLAYER = "INSERT INTO players "
-                + "(account_id, skin_color, hair_color, shirt_color, pants_color, world_x, world_y, weapon, inventory, inventoryAmounts, "
+                + "(account_id, skin_color, hair_color, shirt_color, pants_color, world_x, world_y, weapon, shield,inventory, inventoryAmounts, "
                 + "quest_progress, attack_experience, defence_experience, "
                 + "strength_experience, hitpoints_experience) "
-                + "VALUES (?, 0, 0, 0, 0, 0, 0, null, ?, ?, ?, 0, 0, 0, 1200)";
+                + "VALUES (?, 0, 0, 0, 0, 0, 0, -1,-1, ?, ?, ?, 0, 0, 0, 1200)";
 
         try (Connection connection = DatabaseConnection.createDatabaseConnection();
                 var statement = connection.prepareStatement(SQL_INSERT_PLAYER)) {
             statement.setInt(1, accountID);
-            int[] inventory = new int[20];
-            int[] inventoryAmounts = new int[20];
+            int[] inventory = new int[12];
+            int[] inventoryAmounts = new int[12];
             int[] questProgress = new int[5];
 
             inventory[0] = 100;

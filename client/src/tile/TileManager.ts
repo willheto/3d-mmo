@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { World } from '../world/World';
+import Cache from '../cache/index';
 
 export class TileManager {
 	private world: World;
@@ -13,15 +14,21 @@ export class TileManager {
 	constructor(world: World) {
 		this.world = world;
 		this.setupTileMaterials();
-		this.setupGroundFromCsv(new URL('./map_layer1.csv', import.meta.url).href, 0);
-		this.setupGroundFromCsv(new URL('./map_layer2.csv', import.meta.url).href, 1);
-
 		this.setupObjectMaterials();
-		this.setupObjectsFromCsv(new URL('./map_objects.csv', import.meta.url).href);
+	}
 
-		setTimeout(() => {
-			this.applySlopes();
-		}, 1000);
+	async init() {
+		const layer1 = await Cache.getObjectURLByAssetName('map_layer1.csv');
+		const layer2 = await Cache.getObjectURLByAssetName('map_layer2.csv');
+		const objects = await Cache.getObjectURLByAssetName('map_objects.csv');
+		if(!layer1 || !layer2 || !objects) {
+			throw new Error('Unable to load map data.')
+		}
+		await this.setupGroundFromCsv(new URL(layer1, import.meta.url).href, 0);
+		await this.setupGroundFromCsv(new URL(layer2, import.meta.url).href, 1);
+		await this.setupObjectsFromCsv(new URL(objects, import.meta.url).href);
+
+		this.applySlopes();
 	}
 
 	async loadCsvMap(path: string): Promise<number[][]> {

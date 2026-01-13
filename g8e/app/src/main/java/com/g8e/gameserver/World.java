@@ -110,7 +110,6 @@ public class World {
 
     public void addChatMessage(ChatMessage chatMessage) {
         this.chatMessages.add(chatMessage);
-        Logger.printDebug(chatMessage.getMessage());
     }
 
     public List<ChatMessage> getChatMessages() {
@@ -161,6 +160,12 @@ public class World {
         this.items.forEach(npc -> {
             npc.clearChangedFlags();
         });
+
+        this.items.forEach(item -> {
+            if (item.isDeleted == true) {
+                items.remove(item);
+            }
+        });
     }
 
     private void sentGameStateToConnections() {
@@ -184,13 +189,14 @@ public class World {
                 this.chatMessages,
                 dtoItems, null, this.onlinePlayers);
 
+        removeEmptyCollections(newGameState);
+
         for (WebSocket conn : connections) {
             if (conn != null) {
                 Player player = this.players.stream().filter(p -> p.entityID.equals(conn.toString())).findFirst()
                         .orElse(null);
 
                 if (player != null) {
-                    removeEmptyCollections(newGameState);
                     Gson gson = new GsonBuilder().create();
                     String gameStateJson = gson.toJson(newGameState);
                     byte[] compressedData = Compress.compress(gameStateJson);
@@ -326,6 +332,22 @@ public class World {
 
     private void setInitialItems() {
         this.itemsManager.spawnItem(0, 0, 100);
+        this.itemsManager.spawnItem(0, 0, 100);
+
+        this.itemsManager.spawnItem(0, 0, 100);
+
+        this.itemsManager.spawnItem(0, 0, 100);
+
+        this.itemsManager.spawnItem(0, 0, 100);
+
+        this.itemsManager.spawnItem(0, 0, 100);
+
+        this.itemsManager.spawnItem(0, 0, 100);
+
+        this.itemsManager.spawnItem(0, 0, 100);
+
+        this.itemsManager.spawnItem(0, 0, 100);
+
         this.itemsManager.spawnItem(1, 1, 101);
     }
 

@@ -33,6 +33,14 @@ export default class Chat {
 			e.preventDefault();
 
 			if (e.key === 'Enter') {
+				if (this.currentChatMessage.trim().startsWith('::')) {
+					if (this.currentChatMessage.trim() === '::debug') {
+						this.world.showDebug = !this.world.showDebug;
+						this.currentChatMessage = '';
+						return;
+					}
+				}
+
 				if (this.currentChatMessage.trim() === '') {
 					return;
 				}

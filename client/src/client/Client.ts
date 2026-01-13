@@ -8,6 +8,7 @@ import pako from 'pako';
 import AudioManager from '../managers/AudioManager';
 import { canvas, canvas2d } from '../graphics/2DCanvas';
 import { World } from '../world/World';
+import { Item } from '../item/Item';
 
 const UPDATE_REQUEST = {
 	CHECK_FOR_UPDATES: 1,
@@ -301,7 +302,7 @@ export default class Client {
 
 	private updateGameState(gameData: SocketGameState): void {
 		if (!this.world) return;
-		const { players, npcs, chatMessages, onlinePlayers } = gameData;
+		const { players, npcs, chatMessages, onlinePlayers, items } = gameData;
 
 		// remove players that are no longer online
 		this.world.players.forEach(player => {
@@ -369,6 +370,28 @@ export default class Client {
 		this.world.attackEvents = gameData.tickAttackEvents || [];
 		this.world.soundEvents = gameData.tickSoundEvents || [];
 		this.world.talkEvents = gameData.tickTalkEvents || [];
-		this.world.items = gameData.items || [];
+
+		const itemMap = new Map<string, Item>();
+		this.world.items.forEach(existingItem => {
+			itemMap.set(existingItem.uniqueID, existingItem);
+		});
+
+		items?.forEach(item => {
+			const matchingitem = itemMap.get(item.uniqueID);
+
+			if (matchingitem) {
+				// Update existing item
+				if (item.isDeleted && this.world) {
+					this.world.items = this.world.items.filter(i => item.uniqueID !== i.uniqueID);
+				}
+				matchingitem.update(item);
+			} else {
+				if (!this.world) return;
+				// Create a new item if it doesn't exist and add it to the world
+				const newitem = new Item();
+				newitem.update(item);
+				this.world.items.push(newitem);
+			}
+		});
 	}
 }

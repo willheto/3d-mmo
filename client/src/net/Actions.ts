@@ -120,6 +120,18 @@ export class Actions {
 		);
 	}
 
+	public swapInventorySlots(playerID: string, draggingSlot: number, targetSlot: number): void {
+		console.log(draggingSlot, targetSlot);
+		this.gameSocket?.send(
+			JSON.stringify({
+				action: 'swapInventorySlots',
+				playerID: playerID,
+				fromSlot: draggingSlot,
+				toSlot: targetSlot,
+			}),
+		);
+	}
+
 	public logOut(playerID: string): void {
 		//
 	}

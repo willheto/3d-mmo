@@ -52,7 +52,7 @@ public class V1_init {
             Logger.printInfo("Created players table");
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            Logger.printError(e.getMessage());
         }
     }
 
@@ -67,7 +67,7 @@ public class V1_init {
             Logger.printInfo("Dropped accounts table");
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            Logger.printError(e.getMessage());
         }
     }
 }

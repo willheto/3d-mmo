@@ -44,12 +44,5 @@ export class ExperienceUtils {
 		const nextLevel = this.getExpForLevel(currentLevel + 1);
 
 		return nextLevel - experience;
-
-		if (currentLevel >= 99) return 0;
-
-		const currentLevelDelta = this.calculateExperienceDifference(currentLevel);
-		const nextLevelDelta = this.calculateExperienceDifference(currentLevel + 1);
-
-		return nextLevelDelta - (experience - currentLevelDelta);
 	}
 }

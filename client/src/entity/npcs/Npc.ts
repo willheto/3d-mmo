@@ -266,7 +266,6 @@ export default class Npc extends Entity {
 
 	public onClick() {
 		// prevent immediate close
-		if (this.world.modalJustClosed) return;
 		this.world.canvas.style.pointerEvents = 'auto';
 
 		this.world.modalObject = {
@@ -299,7 +298,7 @@ export default class Npc extends Entity {
 			this.world.modalObject.modalOptions.push({
 				optionText: 'Attack ',
 				optionSecondaryText: {
-					text: npcData.name + ` (level-${this.getCombatLevel()})`,
+					text: npcData.name + ` (Level-${this.getCombatLevel()})`,
 					color: '#ffff66',
 				},
 				optionFunction: () => {

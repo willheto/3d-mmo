@@ -88,6 +88,7 @@ interface SocketItem {
 	isStackable: boolean;
 	amount: number;
 	uniqueID: string;
+	isDeleted: boolean;
 	worldX: number | null;
 	worldY: number | null;
 }

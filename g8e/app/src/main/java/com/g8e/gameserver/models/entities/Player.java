@@ -24,6 +24,7 @@ import com.g8e.gameserver.network.actions.drop.DropItemAction;
 import com.g8e.gameserver.network.actions.edibles.EatItemAction;
 import com.g8e.gameserver.network.actions.inventory.AddItemToInventoryAction;
 import com.g8e.gameserver.network.actions.inventory.RemoveItemFromInventoryAction;
+import com.g8e.gameserver.network.actions.inventory.SwapInventorySlots;
 import com.g8e.gameserver.network.actions.move.ForceNpcAttackPlayerAction;
 import com.g8e.gameserver.network.actions.move.PlayerAttackMove;
 import com.g8e.gameserver.network.actions.move.PlayerMove;
@@ -43,8 +44,8 @@ import com.g8e.util.Logger;
 import com.google.gson.Gson;
 
 public class Player extends Combatant {
-    public int[] inventory = new int[20];
-    public int[] inventoryAmounts = new int[20];
+    public int[] inventory = new int[12];
+    public int[] inventoryAmounts = new int[12];
     public int[] questProgress = new int[10];
     public int influence;
     public int skinColor;
@@ -259,11 +260,12 @@ public class Player extends Combatant {
                     .add(new ChatMessage(this.username, "Too late, it's gone!", System.currentTimeMillis(), false));
             return;
         }
-        addItemToInventory(item.getItemID(), item.getAmount());
-        this.world.itemsManager.removeItem(item.getUniqueID());
-
-        SoundEvent soundEvent = new SoundEvent("pick_up.ogg", true, false, this.entityID, false);
-        this.world.tickSoundEvents.add(soundEvent);
+        boolean wasAddedToInventory = addItemToInventory(item.getItemID(), item.getAmount());
+        if (wasAddedToInventory) {
+            item.setIsDeleted(true);
+            SoundEvent soundEvent = new SoundEvent("pick_up.ogg", true, false, this.entityID, false);
+            this.world.tickSoundEvents.add(soundEvent);
+        }
 
     }
 
@@ -323,7 +325,7 @@ public class Player extends Combatant {
 
             switch (skill) {
                 case SkillUtils.ATTACK -> {
-                    SoundEvent soundEvent = new SoundEvent("attack_level_up.ogg", true, true, this.entityID, true);
+                    SoundEvent soundEvent = new SoundEvent("attack_level_up.ogg", true, true, this.entityID, false);
                     this.world.tickSoundEvents.add(soundEvent);
                 }
                 case SkillUtils.STRENGTH -> {
@@ -407,8 +409,7 @@ public class Player extends Combatant {
                 }
 
                 switch (item.getType()) {
-                    case "sword" -> {
-                        Logger.printDebug("wielding item.");
+                    case "weapon" -> {
                         setWeapon(wieldItemAction.getInventoryIndex());
                         saveWieldables();
                     }
@@ -519,7 +520,61 @@ public class Player extends Combatant {
                 }
             }
 
+            if (action instanceof SwapInventorySlots swapInventorySlotsAction) {
+                handleSwapInventorySlotsAction(swapInventorySlotsAction.getFromSlot(),
+                        swapInventorySlotsAction.getToSlot());
+            }
+
         }
+    }
+
+    private void handleSwapInventorySlotsAction(int fromSlot, int toSlot) {
+
+        // Bounds check
+        if (fromSlot < 0 || toSlot < 0
+                || fromSlot >= this.inventory.length
+                || toSlot >= this.inventory.length) {
+            Logger.printError("Invalid inventory slot swap: " + fromSlot + " -> " + toSlot);
+            return;
+        }
+
+        // No-op
+        if (fromSlot == toSlot) {
+            return;
+        }
+
+        // Swap item IDs
+        int tempItem = this.inventory[fromSlot];
+        this.inventory[fromSlot] = this.inventory[toSlot];
+        this.inventory[toSlot] = tempItem;
+
+        // Swap stack amounts
+        int tempAmount = this.inventoryAmounts[fromSlot];
+        this.inventoryAmounts[fromSlot] = this.inventoryAmounts[toSlot];
+        this.inventoryAmounts[toSlot] = tempAmount;
+
+        // Fix weapon slot reference
+        if (this.weapon == fromSlot) {
+            this.weapon = toSlot;
+            this.weaponChanged = 1;
+        } else if (this.weapon == toSlot) {
+            this.weapon = fromSlot;
+            this.weaponChanged = 1;
+        }
+
+        // Fix shield slot reference
+        if (this.shield == fromSlot) {
+            this.shield = toSlot;
+            this.shieldChanged = 1;
+        } else if (this.shield == toSlot) {
+            this.shield = fromSlot;
+            this.shieldChanged = 1;
+        }
+
+        // Persist + sync
+        saveInventory();
+        this.inventoryChanged = 1;
+        this.inventoryAmountsChanged = 1;
     }
 
     private void handleSellItemAction(String shopID, int inventoryIndex, int amount) {
@@ -829,11 +884,11 @@ public class Player extends Combatant {
         }
     }
 
-    private void addItemToInventory(int itemID, int quantity) {
+    private boolean addItemToInventory(int itemID, int quantity) {
         Item item = this.world.itemsManager.getItemByID(itemID);
         if (item == null) {
             Logger.printError("Item not found");
-            return;
+            return false;
         }
 
         if (item.isStackable() == true) {
@@ -843,11 +898,11 @@ public class Player extends Combatant {
                     if ((long) this.inventoryAmounts[i] + quantity > Integer.MAX_VALUE) {
                         Logger.printError("Quantity exceeds maximum limit for item stack.");
                         world.chatMessages.add(new ChatMessage(this.username,
-                                "You already have a full stack of this item. The item is dropped on the ground.",
+                                "You already have a full stack of this item.",
                                 System.currentTimeMillis(), false));
 
-                        world.itemsManager.spawnItemWithAmount(this.worldX, this.worldY, itemID, 200, quantity);
-                        return;
+                        return false;
+
                     }
                     this.inventoryAmounts[i] += quantity;
                     isItemAlreadyInInventory = true;
@@ -861,10 +916,10 @@ public class Player extends Combatant {
                 if (emptySlot == -1) {
                     Logger.printError("No empty inventory slots, dropping item");
                     world.chatMessages.add(new ChatMessage(this.username,
-                            "You don't have enough space in your inventory. The item is dropped on the ground.",
+                            "You don't have enough space in your inventory.",
                             System.currentTimeMillis(), false));
-                    world.itemsManager.spawnItemWithAmount(this.worldX, this.worldY, itemID, 200, quantity);
-                    return;
+                    return false;
+
                 }
 
                 this.inventory[emptySlot] = itemID;
@@ -873,16 +928,17 @@ public class Player extends Combatant {
         } else {
             if (!item.isStackable() && quantity > 1) {
                 Logger.printError("Cannot add multiple non-stackable items.");
-                return;
+                return false;
+
             }
             int emptySlot = getEmptyInventorySlot();
-
+            Logger.printError(Integer.toString(emptySlot));
             if (emptySlot == -1) {
                 world.chatMessages.add(new ChatMessage(this.username,
-                        "You don't have enough space in your inventory. The item is dropped on the ground.",
+                        "You don't have enough space in your inventory.",
                         System.currentTimeMillis(), false));
-                world.itemsManager.spawnItem(this.worldX, this.worldY, itemID, 200);
-                return;
+                return false;
+
             }
 
             this.inventory[emptySlot] = itemID;
@@ -891,6 +947,7 @@ public class Player extends Combatant {
         saveInventory();
         this.inventoryChanged = 1;
         this.inventoryAmountsChanged = 1;
+        return true;
     }
 
     private void eatItem(int inventoryIndex) {
@@ -1140,8 +1197,8 @@ public class Player extends Combatant {
     }
 
     private void loadPlayerInventory(DBPlayer player) {
-        this.inventory = new int[20];
-        this.inventoryAmounts = new int[20];
+        this.inventory = new int[12];
+        this.inventoryAmounts = new int[12];
         System.arraycopy(player.getInventory(), 0, this.inventory, 0, player.getInventory().length);
         System.arraycopy(player.getInventoryAmounts(), 0, this.inventoryAmounts, 0,
                 player.getInventoryAmounts().length);

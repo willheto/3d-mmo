@@ -9,6 +9,8 @@ public class DTOItem {
     private Integer worldX;
     private Integer worldY;
 
+    private Boolean isDeleted;
+
     public DTOItem(Item item) {
         this.uniqueID = item.getUniqueID();
 
@@ -21,11 +23,15 @@ public class DTOItem {
         }
 
         if (item.worldXChanged == 1) {
-            this.worldX = item.worldXChanged;
+            this.worldX = item.worldX;
         }
 
         if (item.worldYChanged == 1) {
-            this.worldY = item.worldYChanged;
+            this.worldY = item.worldY;
+        }
+
+        if (item.isDeleted == true) {
+            this.isDeleted = item.isDeleted;
         }
     }
 
@@ -34,7 +40,7 @@ public class DTOItem {
         this.itemID = item.getItemID();
         this.amount = item.getAmount();
         this.worldX = item.worldXChanged;
-        this.worldX = item.worldXChanged;
+        this.worldY = item.worldYChanged;
     }
 
     public boolean hasOnlyUniqueId() {
@@ -42,7 +48,8 @@ public class DTOItem {
                 && itemID == null
                 && amount == null
                 && worldX == null
-                && worldY == null;
+                && worldY == null 
+                && isDeleted == null;
     }
 
 }

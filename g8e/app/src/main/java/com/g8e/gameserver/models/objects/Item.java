@@ -1,17 +1,26 @@
 package com.g8e.gameserver.models.objects;
 
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+
 public class Item {
+
+    private static final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+
     private String uniqueID;
     private int itemID;
     private int amount;
-    private Integer worldX = null;
-    private Integer worldY = null;
+    public Integer worldX = null;
+    public Integer worldY = null;
 
-    private transient String name;
-    private transient String examine;
-    private transient boolean isWieldable;
-    final private transient int value;
-    private transient boolean isStackable;
+    private String name;
+    private String examine;
+    private boolean isWieldable;
+    private String spriteName;
+    final private int value;
+    private boolean isStackable;
+    private String type;
+    public boolean isDeleted;
 
     public int uniqueIDChanged = 1;
     public int itemIDChanged = 1;
@@ -19,10 +28,14 @@ public class Item {
     public int worldXChanged = 1;
     public int worldYChanged = 1;
 
-    public Item(int itemID, boolean isWieldable, boolean isStackable, int value) {
+    public Item(int itemID, String name, String examine, boolean isWieldable, boolean isStackable, String spriteName,
+            int value) {
         this.itemID = itemID;
+        this.name = name;
+        this.examine = examine;
         this.isWieldable = isWieldable;
         this.isStackable = isStackable;
+        this.spriteName = spriteName;
         this.value = value;
         this.amount = 1;
     }
@@ -88,12 +101,21 @@ public class Item {
         isWieldable = wieldable;
     }
 
+    public String getSpriteName() {
+        return spriteName;
+    }
+
+    public void setSpriteName(String spriteName) {
+        this.spriteName = spriteName;
+    }
+
     public String getUniqueID() {
         return uniqueID;
     }
 
     public void setUniqueID(String uniqueID) {
         this.uniqueID = uniqueID;
+        this.uniqueIDChanged = 1;
     }
 
     public Integer getWorldX() {
@@ -103,7 +125,6 @@ public class Item {
     public void setWorldX(Integer worldX) {
         this.worldX = worldX;
         this.worldXChanged = 1;
-
     }
 
     public Integer getWorldY() {
@@ -115,4 +136,7 @@ public class Item {
         this.worldYChanged = 1;
     }
 
+    public void setIsDeleted(boolean isDeleted) {
+        this.isDeleted = true;
+    }
 }

@@ -206,12 +206,8 @@ export default class Draw2D {
 				if (isMouseOverOption && option.optionFunction !== null) {
 					option.optionFunction();
 					canvas.style.pointerEvents = 'none';
-
 					world.modalObject = null;
-					world.modalJustClosed = true;
-					setTimeout(() => {
-						world.modalJustClosed = false;
-					}, 100);
+				
 				}
 			});
 		}

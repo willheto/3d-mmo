@@ -179,7 +179,6 @@ export class Hud {
 
 	private onItemRightClick(itemIndex: number, invSlot: number) {
 		// prevent immediate close
-		if (this.world.modalJustClosed) return;
 		canvas.style.pointerEvents = 'auto';
 
 		const itemData = this.world.itemsManager.getItemInfoById(itemIndex);
@@ -197,9 +196,7 @@ export class Hud {
 		const currentPlayer = this.world.players.find(player => player.entityID === this.world.currentPlayerID);
 		if (!currentPlayer) return;
 
-		const isWielded =
-			currentPlayer.inventory[itemData.type === 'weapon' ? currentPlayer.weapon : currentPlayer.shield] ===
-			itemIndex;
+		const isWielded = currentPlayer.weapon === invSlot || currentPlayer.shield === invSlot;
 
 		if (itemData.isWieldable) {
 			this.world.modalObject.modalOptions.push({

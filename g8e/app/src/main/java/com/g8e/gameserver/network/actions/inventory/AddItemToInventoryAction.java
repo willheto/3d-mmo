@@ -3,8 +3,8 @@ package com.g8e.gameserver.network.actions.inventory;
 import com.g8e.gameserver.network.actions.Action;
 
 public class AddItemToInventoryAction extends Action {
-    private int itemID;
-    private int quantity;
+    final private int itemID;
+    final private int quantity;
 
     public AddItemToInventoryAction(String playerID, int itemID, int quantity) {
         this.action = "addItemToInventory";
