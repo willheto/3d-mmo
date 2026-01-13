@@ -1,39 +1,41 @@
 name: Node.js CI and Deploy
 
 on:
-    push:
-        branches: ['master']
+  push:
+    branches: ['master']
 
 jobs:
-    build-and-deploy:
-        runs-on: ubuntu-latest
+  build-and-deploy:
+    runs-on: ubuntu-latest
 
-        strategy:
-            matrix:
-                node-version: [20.x] # Adjust as needed
+    strategy:
+      matrix:
+        node-version: [20.x]
 
-        steps:
-            - name: Set up Node.js ${{ matrix.node-version }}
-              uses: actions/setup-node@v2
-              with:
-                  node-version: ${{ matrix.node-version }}
+    steps:
+      - uses: actions/checkout@v2
 
-            - name: Install dependencies
-              working-directory: client
-              run: npm install
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v2
+        with:
+          node-version: ${{ matrix.node-version }}
 
-            - name: Build production
-              if: github.ref == 'refs/heads/master'
-              working-directory: client
-              run: npm run build-production
+      - name: Install dependencies
+        working-directory: client
+        run: npm install
 
-            - name: Install sshpass
-              run: sudo apt-get update && sudo apt-get install -y sshpass
+      - name: Build production
+        if: github.ref == 'refs/heads/master'
+        working-directory: client
+        run: npm run build-production
 
-            - name: Remove old build artifacts
-              run: |
-                  sshpass -p '${{ secrets.SERVER_PASSWORD }}' ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_IP }} 'sudo rm -rf /var/www/game-client/*'
+      - name: Install sshpass
+        run: sudo apt-get update && sudo apt-get install -y sshpass
 
-            - name: Transfer Build Artifacts
-              run: |
-                  sshpass -p '${{ secrets.SERVER_PASSWORD }}' scp -o StrictHostKeyChecking=no -r dist/* ${{ secrets.SERVER_IP }}:/var/www/game-client
+      - name: Remove old build artifacts
+        run: |
+            sshpass -p '${{ secrets.SERVER_PASSWORD }}' ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_IP }} 'sudo rm -rf /var/www/game-client/*'
+
+      - name: Transfer Build Artifacts
+        run: |
+            sshpass -p '${{ secrets.SERVER_PASSWORD }}' scp -o StrictHostKeyChecking=no -r dist/* ${{ secrets.SERVER_IP }}:/var/www/game-client
