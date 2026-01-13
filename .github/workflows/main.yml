@@ -1,50 +1,38 @@
 name: Node.js CI and Deploy
 
 on:
-  push:
-    branches: ['master']
+    push:
+        branches: ['master']
 
 jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
+    build-and-deploy:
+        runs-on: ubuntu-latest
 
-    strategy:
-      matrix:
-        node-version: [20.x]
+        strategy:
+            matrix:
+                node-version: [20.x] # Adjust as needed
 
-    steps:
-      - uses: actions/checkout@v2
+        steps:
+            - uses: actions/checkout@v2
 
-      - name: Set up Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v2
-        with:
-          node-version: ${{ matrix.node-version }}
+            - name: Set up Node.js ${{ matrix.node-version }}
+              uses: actions/setup-node@v2
+              with:
+                  node-version: ${{ matrix.node-version }}
 
-      - name: Install dependencies
-        working-directory: client
-        run: npm install
+            - run: npm install
 
-      - name: Build production
-        if: github.ref == 'refs/heads/master'
-        working-directory: client
-        run: npm run build-production
+            - name: build-prod
+              if: github.ref == 'refs/heads/master'
+              run: npm run build-production
 
-      - name: Install sshpass
-        run: sudo apt-get update && sudo apt-get install -y sshpass
+            - name: Install sshpass
+              run: sudo apt-get update && sudo apt-get install -y sshpass
 
-      - name: Remove old build artifacts
-        run: |
-          sshpass -p '${{ secrets.SERVER_PASSWORD }}' \
-          ssh -p 2222 \
-            -o StrictHostKeyChecking=no \
-            -o BatchMode=yes \
-          henri@${{ secrets.SERVER_IP }} \
-          'sudo -n rm -rf /var/www/game-client && sudo -n mkdir -p /var/www/game-client'
+            - name: Remove old build artifacts
+              run: |
+                  sshpass -p 2222 '${{ secrets.SERVER_PASSWORD }}' ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_IP }} 'sudo rm -rf /var/www/game-client/*'
 
-
-      - name: Transfer Build Artifacts
-        run: |
-          sshpass -p '${{ secrets.SERVER_PASSWORD }}' \
-          scp -P 2222 -o StrictHostKeyChecking=no \
-          -r dist/* \
-          henri@${{ secrets.SERVER_IP }}:/var/www/game-client/
+            - name: Transfer Build Artifacts
+              run: |
+                  sshpass -p 2222 '${{ secrets.SERVER_PASSWORD }}' scp -o StrictHostKeyChecking=no -r dist/* ${{ secrets.SERVER_IP }}:/var/www/game-client
