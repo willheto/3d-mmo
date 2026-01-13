@@ -35,9 +35,11 @@ jobs:
       - name: Remove old build artifacts
         run: |
           sshpass -p '${{ secrets.SERVER_PASSWORD }}' \
-          ssh -tt -p 2222 -o StrictHostKeyChecking=no \
+          ssh -p 2222 \
+            -o StrictHostKeyChecking=no \
+            -o BatchMode=yes \
           henri@${{ secrets.SERVER_IP }} \
-          'sudo rm -rf /var/www/game-client && sudo mkdir -p /var/www/game-client'
+          'sudo -n rm -rf /var/www/game-client && sudo -n mkdir -p /var/www/game-client'
 
 
       - name: Transfer Build Artifacts
