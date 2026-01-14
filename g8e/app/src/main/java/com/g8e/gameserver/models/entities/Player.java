@@ -1227,8 +1227,8 @@ public class Player extends Combatant {
                 }
             }
         }
-        this.inventory = new int[20];
-        this.inventoryAmounts = new int[20];
+        this.inventory = new int[12];
+        this.inventoryAmounts = new int[12];
         setCurrentHitpoints(ExperienceUtils.getLevelByExp(this.skills[3]));
         move(this.originalWorldX, this.originalWorldY);
         setTargetTile(null);
