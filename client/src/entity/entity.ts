@@ -25,6 +25,12 @@ export class Entity {
 	public entityID: string;
 	public worldX: number = 0;
 	public worldY: number = 0;
+	protected lastTickX = 0;
+	protected lastTickY = 0;
+
+	protected interpTime = 0;
+	protected readonly TICK_DURATION = 0.6; // must match server (600ms)
+
 	public name: string = '';
 	public type: number = 0;
 	public facingDirection: string = 'DOWN';
@@ -120,6 +126,135 @@ export class Entity {
 			case 'LEFT':
 				return -Math.PI / 2; // -X
 		}
+	}
+
+	protected makeZombieModel(): void {
+		this.limbs = {} as any;
+
+		const skinMat = new THREE.MeshStandardMaterial({
+			color: 0x6f8463, // undead green
+			flatShading: true,
+		});
+
+		const clothMat = new THREE.MeshStandardMaterial({
+			color: 0x2f3b2f, // dark ragged cloth
+			flatShading: true,
+		});
+
+		// ===== LEGS =====
+		const legHeight = 1.05;
+		const legGeo = new THREE.BoxGeometry(1, legHeight, 0.22);
+		const legPos = legGeo.attributes.position;
+
+		for (let i = 0; i < legPos.count; i++) {
+			const y = legPos.getY(i);
+			const t = (y + legHeight / 2) / legHeight;
+			const scale = THREE.MathUtils.lerp(0.35, 0.22, t); // OSRS taper
+			legPos.setX(i, legPos.getX(i) * scale);
+		}
+
+		legGeo.computeVertexNormals();
+
+		const hipY = legHeight + 0.02;
+
+		const leftLeg = new THREE.Mesh(legGeo, clothMat);
+		leftLeg.position.set(-0.22, hipY - legHeight / 2, 0);
+		this.model.add(leftLeg);
+
+		const rightLeg = new THREE.Mesh(legGeo, clothMat);
+		rightLeg.position.set(0.22, hipY - legHeight / 2, 0);
+		this.model.add(rightLeg);
+
+		// ===== TORSO =====
+		const torsoHeight = 1.05;
+		const torsoGeo = new THREE.BoxGeometry(1, torsoHeight, 0.28);
+		const torsoPos = torsoGeo.attributes.position;
+
+		for (let i = 0; i < torsoPos.count; i++) {
+			const y = torsoPos.getY(i);
+			const t = (y + torsoHeight / 2) / torsoHeight;
+			const scale = THREE.MathUtils.lerp(0.65, 0.8, t);
+			torsoPos.setX(i, torsoPos.getX(i) * scale);
+		}
+
+		torsoGeo.computeVertexNormals();
+
+		const torso = new THREE.Mesh(torsoGeo, clothMat);
+		torso.position.y = hipY + torsoHeight / 2;
+		torso.rotation.x = 0.12; // slight hunch
+		this.model.add(torso);
+
+		// ===== HEAD =====
+		const headGeo = new THREE.IcosahedronGeometry(0.26, 0);
+		const head = new THREE.Mesh(headGeo, skinMat);
+		head.scale.set(1.15, 1.35, 1.0);
+		head.position.set(0, torso.position.y + torsoHeight / 2 + 0.38, -0.05);
+		head.rotation.x = -0.15;
+		this.model.add(head);
+
+		// ===== ARMS =====
+		const armHeight = 1.15;
+		const armGeo = new THREE.BoxGeometry(1, armHeight, 0.22);
+		const armPos = armGeo.attributes.position;
+
+		for (let i = 0; i < armPos.count; i++) {
+			const y = armPos.getY(i);
+			const t = (y + armHeight / 2) / armHeight;
+			const scale = THREE.MathUtils.lerp(0.32, 0.2, t);
+			armPos.setX(i, armPos.getX(i) * scale);
+		}
+
+		armGeo.computeVertexNormals();
+
+		const shoulderY = torso.position.y + torsoHeight / 2 - 0.15;
+		const shoulderZ = 0.06;
+		const shoulderX = 0.48;
+
+		// Left shoulder
+		const leftShoulder = new THREE.Group();
+		leftShoulder.position.set(-shoulderX, shoulderY, shoulderZ);
+		this.model.add(leftShoulder);
+
+		const leftArm = new THREE.Group();
+		leftShoulder.add(leftArm);
+
+		const leftArmMesh = new THREE.Mesh(armGeo, skinMat);
+		leftArmMesh.position.y = -armHeight / 2;
+		leftArm.add(leftArmMesh);
+
+		leftArm.rotation.x = 0.45;
+		leftArm.rotation.z = 0.15;
+
+		const leftHand = new THREE.Group();
+		leftHand.position.set(0, -armHeight, 0);
+		leftArm.add(leftHand);
+
+		// Right shoulder
+		const rightShoulder = new THREE.Group();
+		rightShoulder.position.set(shoulderX, shoulderY, shoulderZ);
+		this.model.add(rightShoulder);
+
+		const rightArm = new THREE.Group();
+		rightShoulder.add(rightArm);
+
+		const rightArmMesh = new THREE.Mesh(armGeo, skinMat);
+		rightArmMesh.position.y = -armHeight / 2;
+		rightArm.add(rightArmMesh);
+
+		rightArm.rotation.x = 0.25;
+		rightArm.rotation.z = -0.18;
+
+		const rightHand = new THREE.Group();
+		rightHand.position.set(0, -armHeight, 0);
+		rightArm.add(rightHand);
+
+		// ===== STORE LIMBS =====
+		this.limbs.leftArm = leftArm;
+		this.limbs.rightArm = rightArm;
+		this.limbs.leftHand = leftHand;
+		this.limbs.rightHand = rightHand;
+		this.limbs.leftLeg = leftLeg as any;
+		this.limbs.rightLeg = rightLeg as any;
 	}
 
 	protected makeHumanModel(shirtColor: number, legsColor: number): void {

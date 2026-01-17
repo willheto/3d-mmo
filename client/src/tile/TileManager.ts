@@ -10,6 +10,7 @@ export class TileManager {
 	private tileMaterials: Map<number, THREE.MeshStandardMaterial> = new Map();
 	private objectMaterials: Map<number, THREE.MeshStandardMaterial> = new Map();
 	private tiles = new Map<string, THREE.Mesh>();
+	private occupiedTopTiles = new Set<string>(); // "x,z"
 
 	constructor(world: World) {
 		this.world = world;
@@ -21,11 +22,12 @@ export class TileManager {
 		const layer1 = await Cache.getObjectURLByAssetName('map_layer1.csv');
 		const layer2 = await Cache.getObjectURLByAssetName('map_layer2.csv');
 		const objects = await Cache.getObjectURLByAssetName('map_objects.csv');
-		if(!layer1 || !layer2 || !objects) {
-			throw new Error('Unable to load map data.')
+		if (!layer1 || !layer2 || !objects) {
+			throw new Error('Unable to load map data.');
 		}
-		await this.setupGroundFromCsv(new URL(layer1, import.meta.url).href, 0);
 		await this.setupGroundFromCsv(new URL(layer2, import.meta.url).href, 1);
+		await this.setupGroundFromCsv(new URL(layer1, import.meta.url).href, 0);
+
 		await this.setupObjectsFromCsv(new URL(objects, import.meta.url).href);
 
 		this.applySlopes();
@@ -42,17 +44,25 @@ export class TileManager {
 	}
 
 	public getTileHeight(tx: number, tz: number): number {
-		let maxY = 0;
+		let bestLayer = -Infinity;
+		let bestHeight = 0;
 
 		for (const group of this.world.groundGroups) {
 			for (const child of group.children) {
 				if (child.userData.tx === tx && child.userData.tz === tz) {
-					maxY = Math.max(maxY, child.userData.height);
+					const layer = child.userData.layer ?? 0;
+					const h = child.userData.surfaceHeight ?? child.userData.baseHeight ?? 0;
+
+					// prefer higher layers first, then higher surface
+					if (layer > bestLayer || (layer === bestLayer && h > bestHeight)) {
+						bestLayer = layer;
+						bestHeight = h;
+					}
 				}
 			}
 		}
 
-		return maxY;
+		return bestHeight;
 	}
 
 	async setupObjectsFromCsv(path: string) {
@@ -77,17 +87,24 @@ export class TileManager {
 
 		this.world.scene.add(group);
 	}
-
 	async setupGroundFromCsv(path: string, layerIndex: number) {
 		const map = await this.loadCsvMap(path);
 		const tileGeo = new THREE.PlaneGeometry(this.world.TILE_SIZE, this.world.TILE_SIZE);
-
 		const group = new THREE.Group();
 		const y = layerIndex * this.LAYER_HEIGHT;
 
 		for (let z = 0; z < map.length; z++) {
 			for (let x = 0; x < map[z].length; x++) {
 				const tileId = map[z][x];
+				if (tileId < 0) continue;
+
+				const coordKey = `${x},${z}`;
+
+				// ❌ If lower layer AND top tile already exists → skip
+				if (layerIndex === 0 && this.occupiedTopTiles.has(coordKey)) {
+					continue;
+				}
+
 				const mat = this.tileMaterials.get(tileId);
 				if (!mat) continue;
 
@@ -95,15 +112,19 @@ export class TileManager {
 				tile.rotation.x = -Math.PI / 2;
 				tile.position.set(x, y, z);
 
-				// store height on the mesh (VERY IMPORTANT)
-				tile.userData.height = y;
+				tile.userData.baseHeight = y;
+				tile.userData.surfaceHeight = y;
+
 				tile.userData.tx = x;
 				tile.userData.tz = z;
 
-				const key = `${x},${z},${layerIndex}`;
-				this.tiles.set(key, tile);
-
+				this.tiles.set(`${x},${z},${layerIndex}`, tile);
 				group.add(tile);
+
+				// ✅ Mark top tile occupancy
+				if (layerIndex > 0) {
+					this.occupiedTopTiles.add(coordKey);
+				}
 			}
 		}
 
@@ -221,6 +242,12 @@ export class TileManager {
 		for (let i = 0; i < 4; i++) {
 			pos.setZ(i, drop[i] ? DROP : 0);
 		}
+		// If any vertex drops, surface is halfway between top and bottom
+		const isSloped = drop.some(Boolean);
+
+		tile.userData.surfaceHeight = isSloped
+			? tile.userData.baseHeight - this.LAYER_HEIGHT / 2
+			: tile.userData.baseHeight;
 
 		pos.needsUpdate = true;
 		geom.computeVertexNormals();

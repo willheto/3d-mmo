@@ -1,12 +1,6 @@
 package com.g8e.gameserver.models.objects;
 
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-
 public class Item {
-
-    private static final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
-
     private String uniqueID;
     private int itemID;
     private int amount;

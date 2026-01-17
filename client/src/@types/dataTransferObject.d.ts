@@ -53,6 +53,8 @@ interface SocketEntity {
 	entityID: string;
 	worldX: number;
 	worldY: number;
+	lastTickX: number;
+	lastTickY: number;
 	nextTileDirection: Direction;
 	facingDirection: Direction;
 	currentChunk: number;
@@ -61,14 +63,7 @@ interface SocketEntity {
 	isDying: boolean;
 
 	weapon: undefined | number;
-	helmet: undefined | number;
 	shield: undefined | number;
-	bodyArmor: undefined | number;
-	legArmor: undefined | number;
-	gloves: undefined | number;
-	boots: undefined | number;
-	neckwear: undefined | number;
-	ring: undefined | number;
 }
 
 interface SocketChatMessage {

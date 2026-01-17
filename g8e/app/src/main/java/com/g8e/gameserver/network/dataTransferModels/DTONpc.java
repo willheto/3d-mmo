@@ -16,6 +16,8 @@ public class DTONpc {
     public String entityID;
     public Integer worldX;
     public Integer worldY;
+    public Integer lastTickX;
+    public Integer lastTickY;
     public Direction nextTileDirection;
     public Direction facingDirection;
     public Boolean isDying;
@@ -52,12 +54,13 @@ public class DTONpc {
             this.worldY = npc.worldY;
         }
 
-        if (npc.nextTileDirectionChanged == 1) {
-            this.nextTileDirection = npc.nextTileDirection;
-        }
-
         if (npc.facingDirectionChanged == 1) {
             this.facingDirection = npc.facingDirection;
+        }
+
+        if (npc.worldXChanged == 1 || npc.worldYChanged == 1) {
+            this.lastTickX = npc.lastTickX;
+            this.lastTickY = npc.lastTickY;
         }
     }
 
@@ -70,7 +73,6 @@ public class DTONpc {
         this.lastDamageDealt = npc.lastDamageDealt;
         this.worldX = npc.worldX;
         this.worldY = npc.worldY;
-        this.nextTileDirection = npc.nextTileDirection;
         this.facingDirection = npc.facingDirection;
     }
 
@@ -84,7 +86,9 @@ public class DTONpc {
                 && worldY == null
                 && nextTileDirection == null
                 && facingDirection == null
-                && isDying == null;
+                && isDying == null
+                && lastTickX == null
+                && lastTickY == null;
     }
 
     public String getEntityID() {

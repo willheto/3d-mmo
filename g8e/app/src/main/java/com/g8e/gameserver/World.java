@@ -39,8 +39,8 @@ import com.google.gson.GsonBuilder;
 
 public class World {
     private static final int TICK_RATE = 600;
-    public final int maxWorldCol = 20;
-    public final int maxWorldRow = 20;
+    public final int maxWorldCol = 50;
+    public final int maxWorldRow = 50;
     public final int maxPlayers = 1000;
 
     public WebSocketEventsHandler webSocketEventsHandler;
@@ -320,8 +320,9 @@ public class World {
 
     private void setInitialNpcs() {
         for (int i = 0; i < 3; i++) {
-            addNpc(NpcConstants.MAN, 5, 17, 7);
+            addNpc(NpcConstants.MAN, 5, 17, 20);
         }
+        addNpc(1, 27, 17, 5);
     }
 
     private void addNpc(int index, int x, int y, int wanderRange) {
@@ -331,24 +332,23 @@ public class World {
     }
 
     private void setInitialItems() {
-        this.itemsManager.spawnItem(0, 0, 100);
-        this.itemsManager.spawnItem(0, 0, 100);
 
-        this.itemsManager.spawnItem(0, 0, 100);
+    }
 
-        this.itemsManager.spawnItem(0, 0, 100);
+    public Entity getEntityAt(int x, int y) {
+        for (Player player : players) {
+            if (!player.isDying && player.worldX == x && player.worldY == y) {
+                return player;
+            }
+        }
 
-        this.itemsManager.spawnItem(0, 0, 100);
+        for (Npc npc : npcs) {
+            if (!npc.isDying && npc.worldX == x && npc.worldY == y) {
+                return npc;
+            }
+        }
 
-        this.itemsManager.spawnItem(0, 0, 100);
-
-        this.itemsManager.spawnItem(0, 0, 100);
-
-        this.itemsManager.spawnItem(0, 0, 100);
-
-        this.itemsManager.spawnItem(0, 0, 100);
-
-        this.itemsManager.spawnItem(1, 1, 101);
+        return null;
     }
 
     public void setItems(List<Item> items) {

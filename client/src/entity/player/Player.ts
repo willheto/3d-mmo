@@ -30,6 +30,14 @@ export default class Player extends Entity {
 	}
 
 	update(player: SocketPlayer): void {
+		if (player.lastTickX !== undefined && player.lastTickY !== undefined) {
+			this.lastTickX = player.lastTickX;
+			this.lastTickY = player.lastTickY;
+
+			// reset interpolation timer
+			this.interpTime = 0;
+		}
+
 		if (player.worldX !== undefined) {
 			this.worldX = player.worldX;
 		}
@@ -43,9 +51,6 @@ export default class Player extends Entity {
 
 		if (player.facingDirection !== undefined) {
 			this.facingDirection = player.facingDirection;
-		}
-		if (player.nextTileDirection !== undefined) {
-			this.nextTileDirection = player.nextTileDirection;
 		}
 
 		if (player.username !== undefined) this.name = player.username;
@@ -96,6 +101,45 @@ export default class Player extends Entity {
 
 	drawPlayer(dt: number): void {
 		if (!this.limbs) return;
+
+		this.interpTime += dt;
+
+		const alpha = THREE.MathUtils.clamp(this.interpTime / this.TICK_DURATION, 0, 1);
+
+		// snap on teleport / respawn
+		const dist = Math.abs(this.worldX - this.lastTickX) + Math.abs(this.worldY - this.lastTickY);
+
+		if (dist > 1) {
+			const h = this.world.tileManager.getTileHeight(this.worldX, this.worldY);
+			this.model.position.set(this.worldX * this.world.TILE_SIZE, h, this.worldY * this.world.TILE_SIZE);
+		} else {
+			const ix = THREE.MathUtils.lerp(this.lastTickX, this.worldX, alpha);
+			const iy = THREE.MathUtils.lerp(this.lastTickY, this.worldY, alpha);
+
+			const tx = Math.round(ix);
+			const tz = Math.round(iy);
+			const h = this.world.tileManager.getTileHeight(tx, tz);
+
+			this.model.position.set(ix * this.world.TILE_SIZE, h, iy * this.world.TILE_SIZE);
+		}
+
+		const moving = dist <= 1 && alpha < 1; // within-tick interpolation active
+
+		if (moving && this.attackTimer <= 0 && !this.hasDied) {
+			this.walkTime += dt * 8;
+			const swing = Math.sin(this.walkTime) * 0.6;
+
+			this.limbs.leftArm.rotation.x = swing;
+			this.limbs.rightArm.rotation.x = -swing;
+			this.limbs.leftLeg.rotation.x = -swing;
+			this.limbs.rightLeg.rotation.x = swing;
+		} else {
+			// settle limbs when idle (but not during attack/death returns)
+			for (const limb of Object.values(this.limbs)) {
+				limb.rotation.x *= 0.8;
+			}
+		}
+
 		if (this.isInCombat) {
 			const worldPos = this.model.position.clone();
 			worldPos.y += 3.2; // above head
@@ -195,101 +239,6 @@ export default class Player extends Entity {
 
 			this.model.rotation.y =
 				currentYaw + THREE.MathUtils.clamp(delta, -this.TURN_SPEED * dt, this.TURN_SPEED * dt);
-		}
-
-		if (this?.nextTileDirection !== 'NONE') {
-			this.walkTime += dt * 8;
-
-			let nextX = this.worldX;
-			let nextY = this.worldY;
-
-			switch (this.nextTileDirection) {
-				case 'UP':
-					nextY -= 1;
-					break;
-				case 'DOWN':
-					nextY += 1;
-					break;
-				case 'LEFT':
-					nextX -= 1;
-					break;
-				case 'RIGHT':
-					nextX += 1;
-					break;
-			}
-
-			const playerTile = this.worldToTile(this.model.position);
-			const targetTile = this.worldToTile(new THREE.Vector3(nextX, 0, nextY));
-
-			// reached final tile
-			if (playerTile.x === targetTile.x && playerTile.z === targetTile.z && !this.currentTileTarget) {
-				this.model.position.copy(this.tileToWorld(playerTile.x, playerTile.z));
-				this.world.marker.visible = false;
-				return;
-			}
-
-			// pick next tile if needed
-			if (!this.currentTileTarget) {
-				const dx = targetTile.x - playerTile.x;
-				const dz = targetTile.z - playerTile.z;
-
-				const stepX = THREE.MathUtils.clamp(dx, -1, 1);
-				const stepZ = THREE.MathUtils.clamp(dz, -1, 1);
-
-				const nextTx = playerTile.x + stepX;
-				const nextTz = playerTile.z + stepZ;
-
-				const height = this.world.tileManager.getTileHeight(nextTx, nextTz);
-
-				this.currentTileTarget = new THREE.Vector3(
-					nextTx * this.world.TILE_SIZE,
-					height,
-					nextTz * this.world.TILE_SIZE,
-				);
-			}
-
-			// move toward current tile target
-			const dir = this.currentTileTarget.clone().sub(this.model.position);
-			const dist = dir.length();
-
-			if (dist <= this.STOP_RADIUS) {
-				this.model.position.copy(this.currentTileTarget);
-				this.currentTileTarget = null;
-				return;
-			}
-
-			dir.normalize();
-
-			const step = this.SPEED * dt;
-			this.model.position.addScaledVector(dir, Math.min(step, dist));
-
-			const swing = Math.sin(this.walkTime) * 0.6;
-			this.limbs.leftArm.rotation.x = swing;
-			this.limbs.rightArm.rotation.x = -swing;
-			this.limbs.leftLeg.rotation.x = -swing;
-			this.limbs.rightLeg.rotation.x = swing;
-		} else {
-			const height = this.world.tileManager.getTileHeight(this.worldX, this.worldY);
-
-			const expectedWorldPos = new THREE.Vector3(
-				this.worldX * this.world.TILE_SIZE,
-				height,
-				this.worldY * this.world.TILE_SIZE,
-			);
-
-			const drift = this.model.position.distanceTo(expectedWorldPos);
-
-			if (drift > 0.001) {
-				this.model.position.copy(expectedWorldPos);
-				this.currentTileTarget = null;
-				this.walkTime = 0;
-			}
-
-			// settle limbs
-			for (const limb of Object.values(this.limbs)) {
-				limb.rotation.x *= 0.8;
-			}
-			return;
 		}
 	}
 }

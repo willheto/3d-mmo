@@ -128,7 +128,6 @@ public abstract class Combatant extends Entity {
                     npc.setIsDying(true);
                     SoundEvent soundEvent = new SoundEvent("man_death.ogg", true, false, this.entityID, true);
                     this.world.tickSoundEvents.add(soundEvent);
-                    npc.setNextTileDirection(Direction.NONE);
                 }
                 case Player player -> {
                     player.killPlayer();
@@ -160,8 +159,7 @@ public abstract class Combatant extends Entity {
 
     protected void clearTarget() {
         setTargetedEntityID(null);
-        setTargetTile(null);
-        setNewTargetTile(null);
+
     }
 
     public int getCombatLevel() {

@@ -207,7 +207,6 @@ export default class Draw2D {
 					option.optionFunction();
 					canvas.style.pointerEvents = 'none';
 					world.modalObject = null;
-				
 				}
 			});
 		}

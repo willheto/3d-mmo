@@ -6,7 +6,6 @@ import java.util.List;
 import com.g8e.db.CommonQueries;
 import com.g8e.db.models.DBPlayer;
 import com.g8e.gameserver.World;
-import com.g8e.gameserver.enums.Direction;
 import com.g8e.gameserver.enums.GoalAction;
 import com.g8e.gameserver.models.ChatMessage;
 import com.g8e.gameserver.models.events.SoundEvent;
@@ -130,10 +129,6 @@ public class Player extends Combatant {
         worldYChanged = 0;
         facingDirectionChanged = 0;
 
-        targetTileChanged = 0;
-        newTargetTileChanged = 0;
-        nextTileDirectionChanged = 0;
-        currentPathChanged = 0;
         targetEntityLastPositionChanged = 0;
 
         followCounterChanged = 0;
@@ -166,7 +161,7 @@ public class Player extends Combatant {
             return;
         }
 
-        this.moveTowardsTarget();
+        processMovement();
         if (this.targetedEntityID != null) {
             if (goalAction == null) {
                 Logger.printError("Goal action is null, but targeted entity is not null!");
@@ -180,13 +175,31 @@ public class Player extends Combatant {
                 if (target.isDying == true) {
                     this.setTargetedEntityID(null);
                     this.setGoalAction(null);
-                    this.stopAllMovement();
                     this.setTargetEntityLastPosition(null);
                     return;
                 }
             }
 
+            if (targetedEntityID != null && goalAction != null) {
+                Entity target = world.getEntityByID(targetedEntityID);
+                if (target != null) {
+                    TilePosition currentPos = new TilePosition(target.worldX, target.worldY);
+
+                    if (targetEntityLastPosition == null ||
+                            !targetEntityLastPosition.equals(currentPos)) {
+
+                        // target moved → recompute path
+                        TilePosition adj = getBestAdjacentTile(target);
+                        if (adj != null) {
+                            moveTo(adj);
+                            setTargetEntityLastPosition(currentPos);
+                        }
+                    }
+                }
+            }
+
             if (isOneStepAwayFromTarget()) {
+                clearWaypoints();
                 Entity entity = this.world.getEntityByID(this.targetedEntityID);
                 if (entity != null) {
                     setTargetEntityLastPosition(null);
@@ -196,12 +209,10 @@ public class Player extends Combatant {
                         case ATTACK -> {
                             if (entity instanceof Combatant combatant) {
                                 ((Combatant) this).attackEntity(combatant);
-                                stopAllMovement();
                             }
                         }
                         case TALK -> {
                             if (entity instanceof Npc npc) {
-                                stopAllMovement();
                                 this.setGoalAction(null);
                                 this.setTargetedEntityID(null);
 
@@ -217,7 +228,6 @@ public class Player extends Combatant {
                         }
                         case TRADE -> {
                             if (entity instanceof Npc npc) {
-                                this.stopAllMovement();
                                 this.setGoalAction(null);
                                 this.setTargetedEntityID(null);
                                 TradeEvent tradeEvent = new TradeEvent(this.entityID, entity.entityID,
@@ -376,7 +386,7 @@ public class Player extends Combatant {
             }
 
             if (action instanceof PlayerMove playerMove) {
-                setNewTargetTile(new TilePosition(playerMove.getX(), playerMove.getY()));
+                moveTo(new TilePosition(playerMove.getX(), playerMove.getY()));
                 setTargetItemID(null);
                 setTargetedEntityID(null);
                 setGoalAction(null);
@@ -389,8 +399,11 @@ public class Player extends Combatant {
                     return;
                 }
 
-                setNewTargetTile(new TilePosition(npc.worldX, npc.worldY));
-                this.newTargetTile = new TilePosition(npc.worldX, npc.worldY);
+                TilePosition adj = getBestAdjacentTile(npc);
+                if (adj != null) {
+                    moveTo(adj);
+                }
+
                 setTargetedEntityID(playerAttackMove.getEntityID());
                 setGoalAction(GoalAction.ATTACK);
             }
@@ -450,7 +463,7 @@ public class Player extends Combatant {
                 if (entity != null) {
                     setTargetedEntityID(playerTalkMoveAction.getEntityID());
                     setGoalAction(GoalAction.TALK);
-                    setTargetTile(new TilePosition(entity.worldX, entity.worldY));
+                    moveTo(new TilePosition(entity.worldX, entity.worldY));
                 }
             }
 
@@ -515,7 +528,7 @@ public class Player extends Combatant {
                     } else {
                         setTargetedEntityID(tradeMoveAction.getEntityID());
                         setGoalAction(GoalAction.TRADE);
-                        setNewTargetTile(new TilePosition(entity.worldX, entity.worldY));
+                        moveTo(new TilePosition(entity.worldX, entity.worldY));
                     }
                 }
             }
@@ -1007,7 +1020,7 @@ public class Player extends Combatant {
         }
 
         setTargetItemID(uniqueItemID);
-        setNewTargetTile(new TilePosition(item.getWorldX(), item.getWorldY()));
+        moveTo(new TilePosition(item.getWorldX(), item.getWorldY()));
     }
 
     private void questProgressUpdate(int questID, int progress) {
@@ -1205,8 +1218,8 @@ public class Player extends Combatant {
     }
 
     public void killPlayer() {
+        clearWaypoints();
         setIsDying(true);
-        stopAllMovement();
         this.world.chatMessages
                 .add(new ChatMessage(this.username, "Oh dear, you are dead!", System.currentTimeMillis(), false));
     }
@@ -1231,18 +1244,15 @@ public class Player extends Combatant {
         this.inventoryAmounts = new int[12];
         setCurrentHitpoints(ExperienceUtils.getLevelByExp(this.skills[3]));
         move(this.originalWorldX, this.originalWorldY);
-        setTargetTile(null);
-        setNewTargetTile(null);
         setTargetedEntityID(null);
         setTargetItemID(null);
         setIsInCombatCounter(0);
         setLastDamageDealt(-1);
         setLastDamageDealtCounter(0);
         setAttackTickCounter(0);
-        setCurrentPath(null);
-        setNextTileDirection(Direction.NONE);
         setGoalAction(null);
         setIsInCombat(false);
+        clearWaypoints();
 
         this.saveInventory();
         this.inventoryChanged = 1;

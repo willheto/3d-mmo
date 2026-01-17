@@ -32,7 +32,8 @@ public class DTOPlayer {
     public String entityID;
     public Integer worldX;
     public Integer worldY;
-    public Direction nextTileDirection;
+    public Integer lastTickX;
+    public Integer lastTickY;
     public Direction facingDirection;
     public List<PathNode> currentPath;
     public Boolean isDying;
@@ -95,23 +96,19 @@ public class DTOPlayer {
         if (player.worldYChanged == 1)
             this.worldY = player.worldY;
 
-        if (player.nextTileDirectionChanged == 1) {
-            this.nextTileDirection = player.nextTileDirection;
-        }
-
         if (player.facingDirectionChanged == 1) {
             this.facingDirection = player.facingDirection;
-        }
-
-        if (player.currentPathChanged == 1) {
-            this.currentPath = player.currentPath == null
-                    ? null
-                    : List.copyOf(player.currentPath);
         }
 
         if (player.usernameChanged == 1) {
             this.username = player.username;
         }
+
+        if (player.worldXChanged == 1 || player.worldYChanged == 1) {
+            this.lastTickX = player.lastTickX;
+            this.lastTickY = player.lastTickY;
+        }
+
     }
 
     public DTOPlayer(Player player, boolean includeEverything) {
@@ -134,11 +131,7 @@ public class DTOPlayer {
         this.lastDamageDealt = player.lastDamageDealt;
         this.worldX = player.worldX;
         this.worldY = player.worldY;
-        this.nextTileDirection = player.nextTileDirection;
         this.facingDirection = player.facingDirection;
-        this.currentPath = player.currentPath == null
-                ? null
-                : List.copyOf(player.currentPath);
         this.username = player.username;
 
     }
@@ -163,10 +156,11 @@ public class DTOPlayer {
                 && lastDamageDealt == null
                 && worldX == null
                 && worldY == null
-                && nextTileDirection == null
                 && facingDirection == null
                 && currentPath == null
-                && isDying == null;
+                && isDying == null
+                && lastTickX == null
+                && lastTickY == null;
     }
 
     public String getEntityID() {

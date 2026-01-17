@@ -36,34 +36,30 @@ public final class TileManager {
     }
 
     public TilePosition getClosestWalkableTile(int x, int y) {
-        try {
-            int distance = 0;
+        int distance = 0;
 
-            while (true) {
-                // Search in increasing distance from the target tile
-                for (int i = -distance; i <= distance; i++) {
-                    for (int j = -distance; j <= distance; j++) {
-                        // Only check the outermost tiles of the current square (Manhattan distance)
-                        if (i == -distance || i == distance || j == -distance || j == distance) {
-                            int newX = x + i;
-                            int newY = y + j;
+        while (true) {
+            // Search in increasing distance from the target tile
+            for (int i = -distance; i <= distance; i++) {
+                for (int j = -distance; j <= distance; j++) {
+                    // Only check the outermost tiles of the current square (Manhattan distance)
+                    if (i == -distance || i == distance || j == -distance || j == distance) {
+                        int newX = x + i;
+                        int newY = y + j;
 
-                            // Check bounds to avoid IndexOutOfBoundsException
-                            if (newX >= 0 && newX < world.maxWorldCol && newY >= 0 && newY < world.maxWorldRow) {
-                                if (!getCollisionByXandY(newX, newY)) {
-                                    return new TilePosition(newX, newY);
-                                }
+                        // Check bounds to avoid IndexOutOfBoundsException
+                        if (newX >= 0 && newX < world.maxWorldCol && newY >= 0 && newY < world.maxWorldRow) {
+                            if (!getCollisionByXandY(newX, newY)) {
+                                return new TilePosition(newX, newY);
                             }
                         }
                     }
                 }
-                // If no walkable tile found, expand the search area by increasing the distance
-                distance++;
             }
-        } catch (Exception e) {
-            Logger.printError(e.getMessage());
+            // If no walkable tile found, expand the search area by increasing the distance
+            distance++;
         }
-        return null; // In case no walkable tile is found
+
     }
 
     public int getChunkByWorldXandY(int worldX, int worldY) {
@@ -117,25 +113,26 @@ public final class TileManager {
     }
 
     public boolean getCollisionByXandY(int x, int y) {
-        try {
-            // Check if x and y are within the bounds of the map arrays
-            if (x < 0 || y < 0 || x >= mapTileNumLayer1.length || y >= mapTileNumLayer1[0].length) {
-                return true; // out of bounds
-            }
 
-            int index1 = mapTileNumLayer1[x][y];
-            int index2 = mapTileNumLayer2[x][y];
-            int index3 = mapTileNumLayer3[x][y];
-            // Check for valid tile indices and if any of them have a collision
-            if ((index1 >= 0 && tile[index1].collision) ||
-                    (index2 >= 0 && tile[index2].collision) ||
-                    (index3 >= 0 && tile[index3].collision)) {
-                return true;
-            }
-
-        } catch (Exception e) {
-            Logger.printError(e.getMessage());
+        if (x < 0 || y < 0
+                || x >= mapTileNumLayer1.length
+                || y >= mapTileNumLayer1[0].length) {
+            return true;
         }
+
+        int[] layers = {
+                mapTileNumLayer3[x][y],
+                mapTileNumLayer2[x][y],
+                mapTileNumLayer1[x][y]
+        };
+
+        for (int tileIndex : layers) {
+            if (tileIndex == -1)
+                continue;
+
+            return tile[tileIndex].collision;
+        }
+
         return false;
     }
 
@@ -163,14 +160,14 @@ public final class TileManager {
             try (BufferedReader br = new BufferedReader(new InputStreamReader(is))) {
                 int col = 0;
                 int row = 0;
-                
+
                 while (col < world.maxWorldCol && row < world.maxWorldRow) {
                     String line = br.readLine();
-                    
+
                     while (col < world.maxWorldCol) {
                         String numbers[] = line.split(",");
                         int num = Integer.parseInt(numbers[col]);
-                        
+
                         // Depending on the layer, assign the number to the respective map
                         switch (layer) {
                             case 1:

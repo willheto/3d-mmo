@@ -89,6 +89,7 @@ export class World {
 	private loadingMessage = 'Loading...';
 	public showDebug: boolean = true;
 
+
 	private prepareCanvasForRenderer(): HTMLCanvasElement {
 		const oldCanvas = document.getElementById('viewport')!;
 		const newCanvas = document.createElement('canvas');
@@ -288,6 +289,7 @@ export class World {
 	}
 
 	update(dt: number) {
+
 		canvas2d.clearRect(0, 0, canvas.width, canvas.height);
 
 		this.updatePlayers(dt);
@@ -453,16 +455,16 @@ export class World {
 	}
 
 	private onPointerDown(e: PointerEvent) {
-		if (
-			this.modalObject &&
-			!(
-				this.mouseScreenX < this.modalObject.modalX - 10 ||
-				this.mouseScreenX > this.modalObject.modalX + this.modalObject.modalWidth + 10 ||
-				this.mouseScreenY < this.modalObject.modalY - 10 ||
-				this.mouseScreenY > this.modalObject.modalY + this.modalObject.modalHeight + 10
-			)
-		) {
-			return;
+		// If modal exists and click is inside it, do NOTHING here.
+		// Let Draw2D handle it.
+		if (this.modalObject) {
+			const inside =
+				this.mouseScreenX >= this.modalObject.modalX &&
+				this.mouseScreenX <= this.modalObject.modalX + this.modalObject.modalWidth &&
+				this.mouseScreenY >= this.modalObject.modalY &&
+				this.mouseScreenY <= this.modalObject.modalY + this.modalObject.modalHeight;
+
+			if (inside) return;
 		}
 
 		// Over UI

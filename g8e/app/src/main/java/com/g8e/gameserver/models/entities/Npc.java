@@ -3,6 +3,7 @@ package com.g8e.gameserver.models.entities;
 import com.g8e.gameserver.World;
 import com.g8e.gameserver.enums.Direction;
 import com.g8e.gameserver.models.DropTable;
+import com.g8e.gameserver.tile.TilePosition;
 import com.g8e.gameserver.util.ExperienceUtils;
 import com.g8e.gameserver.util.SkillUtils;
 import com.g8e.util.Logger;
@@ -59,10 +60,6 @@ public class Npc extends Combatant {
         worldYChanged = 0;
         facingDirectionChanged = 0;
 
-        targetTileChanged = 0;
-        newTargetTileChanged = 0;
-        nextTileDirectionChanged = 0;
-        currentPathChanged = 0;
         targetEntityLastPositionChanged = 0;
 
         followCounterChanged = 0;
@@ -83,6 +80,7 @@ public class Npc extends Combatant {
 
     @Override
     public void update() {
+        processMovement();
         updateCounters();
 
         if (interactionTargetID != null) {
@@ -112,7 +110,7 @@ public class Npc extends Combatant {
                 setFacingDirection(Direction.DOWN);
             }
 
-            stopAllMovement();
+            clearWaypoints();
             return;
         }
 
@@ -129,26 +127,33 @@ public class Npc extends Combatant {
             }
         }
 
-        if (this.targetedEntityID == null) {
-            // 20% chance to set new target
+        if (targetedEntityID == null && !hasWaypoints()) {
             if (Math.random() < 0.05) {
-                setNewTargetTileWithingWanderArea();
+                TilePosition wanderTarget = getRandomWanderTarget();
+                if (wanderTarget != null) {
+                    moveTo(wanderTarget);
+                }
             }
         }
 
-        if (this.targetTile != null && this.isTargetTileNotWithinWanderArea()) {
-            setTargetedEntityID(null);
-            setNewTargetTileWithingWanderArea();
-        }
-
-        if (this.targetedEntityID != null) {
-            if (this.followCounter > 0) {
-                setFollowCounter(--this.followCounter);
-            } else {
-                moveTowardsTarget();
+        // --- Follow / Attack ---
+        if (targetedEntityID != null) {
+            Entity target = world.getEntityByID(targetedEntityID);
+            if (target == null || target.isDying) {
+                setTargetedEntityID(null);
+                clearWaypoints();
+                return;
             }
-        } else {
-            moveTowardsTarget();
+
+            if (!isOneStepAwayFromTarget()) {
+                // Re-path only if we ran out of steps
+                if (!hasWaypoints()) {
+                    TilePosition adj = getBestAdjacentTile(target);
+                    if (adj != null) {
+                        moveTo(adj);
+                    }
+                }
+            }
         }
 
         if (this.targetedEntityID != null) {
@@ -156,11 +161,22 @@ public class Npc extends Combatant {
                 Entity entity = this.world.getEntityByID(((Combatant) this).targetedEntityID);
                 if (entity != null && entity instanceof Combatant) {
                     ((Combatant) this).attackEntity((Combatant) entity);
-                    stopAllMovement();
+                    clearWaypoints();
+
                     setFacingDirection(this.getDirectionTowardsTile(entity.worldX, entity.worldY));
                 }
             }
         }
+    }
+
+    private TilePosition getRandomWanderTarget() {
+        int x = originalWorldX + (int) (Math.random() * (wanderRange * 2 + 1) - wanderRange);
+        int y = originalWorldY + (int) (Math.random() * (wanderRange * 2 + 1) - wanderRange);
+
+        if (!world.tileManager.getCollisionByXandY(x, y)) {
+            return new TilePosition(x, y);
+        }
+        return null;
     }
 
     private boolean isOneStepAwayFromTarget() {
@@ -233,16 +249,12 @@ public class Npc extends Combatant {
     public void resetNpc() {
         setCurrentHitpoints(ExperienceUtils.getLevelByExp(this.skills[3]));
         move(this.originalWorldX, this.originalWorldY);
-        setTargetTile(null);
-        setNewTargetTile(null);
         setTargetedEntityID(null);
         setTargetItemID(null);
         setIsInCombatCounter(0);
         setLastDamageDealt(-1);
         setLastDamageDealtCounter(0);
         setAttackTickCounter(0);
-        setCurrentPath(null);
-        setNextTileDirection(Direction.NONE);
         setGoalAction(null);
         setIsInCombat(false);
     }

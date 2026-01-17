@@ -105,7 +105,7 @@ public class RegisterServer {
                 + "(account_id, skin_color, hair_color, shirt_color, pants_color, world_x, world_y, weapon, shield,inventory, inventoryAmounts, "
                 + "quest_progress, attack_experience, defence_experience, "
                 + "strength_experience, hitpoints_experience) "
-                + "VALUES (?, 0, 0, 0, 0, 0, 0, -1,-1, ?, ?, ?, 0, 0, 0, 1200)";
+                + "VALUES (?, 0, 0, 0, 0, 27, 17, -1,-1, ?, ?, ?, 0, 0, 0, 1200)";
 
         try (Connection connection = DatabaseConnection.createDatabaseConnection();
                 var statement = connection.prepareStatement(SQL_INSERT_PLAYER)) {
