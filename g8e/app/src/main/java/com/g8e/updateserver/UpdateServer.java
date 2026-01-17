@@ -9,7 +9,6 @@ import org.java_websocket.WebSocket;
 import org.java_websocket.handshake.ClientHandshake;
 import org.java_websocket.server.WebSocketServer;
 
-import com.g8e.updateserver.AssetLoader.Asset;
 import com.g8e.updateserver.models.UpdateRequest;
 import com.g8e.updateserver.models.UpdateResponse;
 import com.g8e.updateserver.util.UpdateConstants;
@@ -20,6 +19,7 @@ import com.google.gson.JsonSyntaxException;
 public class UpdateServer extends WebSocketServer {
 
     private final Gson gson = new Gson();
+    private volatile List<AssetLoader.Asset> cachedAssets;
 
     public UpdateServer() throws IOException {
 
@@ -53,10 +53,21 @@ public class UpdateServer extends WebSocketServer {
 
     private void handleUpdateAvailable(WebSocket conn) {
         try {
-            List<Asset> assets = new AssetLoader().getAssets("/data");
-            UpdateResponse response = new UpdateResponse(UpdateConstants.UPDATE_RESPONSE_UPDATE_AVAILABLE,
-                    UpdateConstants.CACHE_VERSION, assets);
+            if (cachedAssets == null) {
+                synchronized (this) {
+                    if (cachedAssets == null) {
+                        cachedAssets = new AssetLoader().getAssets("/data");
+                    }
+                }
+            }
+
+            UpdateResponse response = new UpdateResponse(
+                    UpdateConstants.UPDATE_RESPONSE_UPDATE_AVAILABLE,
+                    UpdateConstants.CACHE_VERSION,
+                    cachedAssets);
+
             conn.send(gson.toJson(response));
+
         } catch (IOException | URISyntaxException e) {
             Logger.printError("Failed to pack assets: " + e.getMessage());
         }

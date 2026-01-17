@@ -11,83 +11,62 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class AssetLoader {
 
-    private static FileSystem fs = null; // Store the FileSystem to avoid reopening it
-
     public List<Asset> getAssets(String directoryPath) throws IOException, URISyntaxException {
-        List<Asset> assets = new ArrayList<>();
-
-        // Load the resource URL
         URL resourceUrl = getClass().getResource(directoryPath);
         if (resourceUrl == null) {
             throw new IllegalArgumentException("Resource not found: " + directoryPath);
         }
 
-        // Use toURI to get a valid URI
         URI uri = resourceUrl.toURI();
+        List<Asset> assets = new ArrayList<>();
 
-        // Check if the URI is pointing to a JAR file
-        if (uri.getScheme().equals("jar")) {
-            // If the file system is not already opened, open it
-            if (fs == null) {
-                fs = FileSystems.newFileSystem(uri, new HashMap<>());
-            }
-
-            Path path = fs.getPath(directoryPath);
-
-            try (DirectoryStream<Path> stream = Files.newDirectoryStream(path)) {
-                for (Path entry : stream) {
-                    if (Files.isDirectory(entry)) {
-                        // Recursively load assets from subdirectories inside the JAR
-                        List<Asset> subAssets = getAssets("/data/" + entry.getFileName().toString());
-                        assets.add(new Asset(entry.getFileName().toString(), "directory", subAssets));
-                    } else {
-                        // Read file data
-                        byte[] data = Files.readAllBytes(entry);
-                        assets.add(new Asset(entry.getFileName().toString(), "file", data));
-                    }
-                }
+        if ("jar".equals(uri.getScheme())) {
+            try (FileSystem fs = FileSystems.newFileSystem(uri, Map.of())) {
+                Path root = fs.getPath(directoryPath);
+                loadDirectory(root, assets);
             }
         } else {
-            // Resource is on the filesystem, handle it as before
-            Path path = Paths.get(uri);
-            try (DirectoryStream<Path> stream = Files.newDirectoryStream(path)) {
-                for (Path entry : stream) {
-                    if (Files.isDirectory(entry)) {
-                        // Pass the relative path of the subdirectory correctly
-                        List<Asset> subAssets = getAssets("/data/" + entry.getFileName().toString());
-                        assets.add(new Asset(entry.getFileName().toString(), "directory", subAssets));
-                    } else {
-                        // Read file data
-                        byte[] data = Files.readAllBytes(entry);
-                        assets.add(new Asset(entry.getFileName().toString(), "file", data));
-                    }
-                }
-            }
+            Path root = Paths.get(uri);
+            loadDirectory(root, assets);
         }
 
         return assets;
     }
 
+    private void loadDirectory(Path dir, List<Asset> assets) throws IOException {
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir)) {
+            for (Path entry : stream) {
+                if (Files.isDirectory(entry)) {
+                    List<Asset> children = new ArrayList<>();
+                    loadDirectory(entry, children);
+                    assets.add(new Asset(
+                            entry.getFileName().toString(),
+                            "directory",
+                            children));
+                } else {
+                    assets.add(new Asset(
+                            entry.getFileName().toString(),
+                            "file",
+                            Files.readAllBytes(entry)));
+                }
+            }
+        }
+    }
+
     public static class Asset {
-        final private String name;
-        final private String type;
-        final private Object data;
+        private final String name;
+        private final String type;
+        private final Object data;
 
         public Asset(String name, String type, Object data) {
             this.name = name;
             this.type = type;
             this.data = data;
-        }
-
-        @Override
-        public String toString() {
-            return "Asset{name='" + name + "', type='" + type + "', data="
-                    + (data instanceof byte[] ? "[byte array]" : data) + '}';
         }
     }
 }
