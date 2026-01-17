@@ -1,4 +1,4 @@
-<h1>3D-MMORPGr</h1>
+<h1>3D-MMORPG</h1>
 
 **early development**
 **HEAVILY INSPIRED BY RUNESCAPE**
