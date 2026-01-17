@@ -1,9 +1,8 @@
 package com.g8e.gameserver.enums;
 
 public enum Direction {
-    UP,
-    RIGHT,
-    DOWN,
-    LEFT,
+    UP, DOWN, LEFT, RIGHT,
+    UP_LEFT, UP_RIGHT,
+    DOWN_LEFT, DOWN_RIGHT,
     NONE
 }

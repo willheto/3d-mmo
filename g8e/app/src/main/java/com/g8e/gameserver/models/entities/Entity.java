@@ -13,6 +13,9 @@ public abstract class Entity {
     public String entityID;
     public int worldX;
     public int worldY;
+    public int lastTickX;
+    public int lastTickY;
+
     public Direction facingDirection = Direction.DOWN;
 
     public transient World world;
@@ -41,9 +44,6 @@ public abstract class Entity {
     protected transient int waypointIndex = -1;
 
     protected transient Direction walkDirection = Direction.NONE;
-
-    public int lastTickX;
-    public int lastTickY;
 
     public int entityIDChanged = 1;
 
@@ -143,22 +143,66 @@ public abstract class Entity {
         int nx = worldX;
         int ny = worldY;
 
-        Entity occupying = world.getEntityAt(nx, ny);
-        if (occupying != null && occupying != this) {
-            return false;
-        }
-
         switch (dir) {
             case UP -> ny--;
             case DOWN -> ny++;
             case LEFT -> nx--;
             case RIGHT -> nx++;
+
+            case UP_LEFT -> {
+                nx--;
+                ny--;
+            }
+            case UP_RIGHT -> {
+                nx++;
+                ny--;
+            }
+            case DOWN_LEFT -> {
+                nx--;
+                ny++;
+            }
+            case DOWN_RIGHT -> {
+                nx++;
+                ny++;
+            }
+
             default -> {
                 return false;
             }
         }
 
-        return !world.tileManager.getCollisionByXandY(nx, ny);
+        // block entity collision
+        Entity occupying = world.getEntityAt(nx, ny);
+        if (occupying != null && occupying != this) {
+            return false;
+        }
+
+        // base tile collision
+        if (world.tileManager.getCollisionByXandY(nx, ny)) {
+            return false;
+        }
+
+        // diagonal corner check (CRITICAL)
+        if (isDiagonal(dir)) {
+            int cx = nx;
+            int cy = worldY;
+            int dx = worldX;
+            int dy = ny;
+
+            if (world.tileManager.getCollisionByXandY(cx, cy))
+                return false;
+            if (world.tileManager.getCollisionByXandY(dx, dy))
+                return false;
+        }
+
+        return true;
+    }
+
+    private boolean isDiagonal(Direction dir) {
+        return dir == Direction.UP_LEFT ||
+                dir == Direction.UP_RIGHT ||
+                dir == Direction.DOWN_LEFT ||
+                dir == Direction.DOWN_RIGHT;
     }
 
     protected void moveOneTile(Direction dir) {
@@ -172,6 +216,23 @@ public abstract class Entity {
             case DOWN -> worldY++;
             case LEFT -> worldX--;
             case RIGHT -> worldX++;
+
+            case UP_LEFT -> {
+                worldX--;
+                worldY--;
+            }
+            case UP_RIGHT -> {
+                worldX++;
+                worldY--;
+            }
+            case DOWN_LEFT -> {
+                worldX--;
+                worldY++;
+            }
+            case DOWN_RIGHT -> {
+                worldX++;
+                worldY++;
+            }
         }
 
         setWorldX(worldX);
@@ -189,16 +250,9 @@ public abstract class Entity {
     }
 
     protected Direction getDirectionTowardsTile(int entityX, int entityY) {
-        if (entityX < this.worldX) {
-            return Direction.LEFT;
-        } else if (entityX > this.worldX) {
-            return Direction.RIGHT;
-        } else if (entityY < this.worldY) {
-            return Direction.UP;
-        } else {
-            return Direction.DOWN;
-        }
-
+        int dx = Integer.compare(entityX, this.worldX);
+        int dy = Integer.compare(entityY, this.worldY);
+        return getDirection(dx, dy);
     }
 
     // Always use move instead of explicitly setting worldX and worldY
@@ -211,26 +265,27 @@ public abstract class Entity {
         }
     }
 
-    protected Direction getDirection(int deltaX, int deltaY) {
-        if (deltaX == 0 && deltaY == 0) {
-            return null;
-        }
+    protected Direction getDirection(int dx, int dy) {
+        if (dx == 0 && dy == 0)
+            return Direction.NONE;
 
-        if (deltaX == 0 && deltaY == -1) {
+        if (dx == -1 && dy == -1)
+            return Direction.UP_LEFT;
+        if (dx == 1 && dy == -1)
+            return Direction.UP_RIGHT;
+        if (dx == -1 && dy == 1)
+            return Direction.DOWN_LEFT;
+            if (dx == 1 && dy == 1)
+            return Direction.DOWN_RIGHT;
+
+        if (dx == 0 && dy == -1)
             return Direction.UP;
-        }
-
-        if (deltaX == 0 && deltaY == 1) {
+        if (dx == 0 && dy == 1)
             return Direction.DOWN;
-        }
-
-        if (deltaX == -1 && deltaY == 0) {
+        if (dx == -1 && dy == 0)
             return Direction.LEFT;
-        }
-
-        if (deltaX == 1 && deltaY == 0) {
+        if (dx == 1 && dy == 0)
             return Direction.RIGHT;
-        }
 
         return Direction.NONE;
     }

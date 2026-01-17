@@ -15,7 +15,6 @@ import org.java_websocket.exceptions.WebsocketNotConnectedException;
 import com.g8e.gameserver.constants.NpcConstants;
 import com.g8e.gameserver.managers.EntitiesManager;
 import com.g8e.gameserver.managers.ItemsManager;
-import com.g8e.gameserver.managers.QuestsManager;
 import com.g8e.gameserver.models.ChatMessage;
 import com.g8e.gameserver.models.entities.Entity;
 import com.g8e.gameserver.models.entities.Npc;
@@ -47,7 +46,7 @@ public class World {
     public TileManager tileManager = new TileManager(this);
     public ItemsManager itemsManager = new ItemsManager(this);
     public EntitiesManager entitiesManager = new EntitiesManager();
-    public QuestsManager questsManager = new QuestsManager();
+   // public QuestsManager questsManager = new QuestsManager();
     public List<Player> players = new ArrayList<>();
     public List<Npc> npcs = new ArrayList<>();
     public List<Item> items = new ArrayList<>();

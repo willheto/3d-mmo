@@ -10,14 +10,12 @@ export abstract class Interaction {
 		this.world = world;
 		this.targetID = targetID;
 		this.npcName = npcName;
-		canvas.style.pointerEvents = 'auto';
 	}
 
 	abstract startDialogue(): void;
 
 	protected endDialogue(): void {
 		this.world.chat.talkModal = null;
-		canvas.style.pointerEvents = 'none';
 	}
 
 	protected async npcSays(text: string): Promise<void> {

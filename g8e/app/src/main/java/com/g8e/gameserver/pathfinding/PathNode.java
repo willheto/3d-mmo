@@ -1,7 +1,5 @@
 package com.g8e.gameserver.pathfinding;
 
-import java.util.Objects;
-
 public class PathNode {
     public int x;
     public int y;
@@ -25,19 +23,18 @@ public class PathNode {
     }
 
     @Override
-    public boolean equals(Object obj) {
-        if (this == obj) {
+    public boolean equals(Object o) {
+        if (this == o)
             return true;
-        }
-        if (obj == null || getClass() != obj.getClass()) {
+        if (!(o instanceof PathNode))
             return false;
-        }
-        PathNode pathNode = (PathNode) obj;
-        return x == pathNode.x && y == pathNode.y;
+        PathNode n = (PathNode) o;
+        return x == n.x && y == n.y;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(x, y);
+        return 31 * x + y;
     }
+
 }

@@ -159,7 +159,7 @@ public abstract class Combatant extends Entity {
 
     protected void clearTarget() {
         setTargetedEntityID(null);
-
+        setTargetItemID(null);
     }
 
     public int getCombatLevel() {

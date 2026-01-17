@@ -89,7 +89,6 @@ export class World {
 	private loadingMessage = 'Loading...';
 	public showDebug: boolean = true;
 
-
 	private prepareCanvasForRenderer(): HTMLCanvasElement {
 		const oldCanvas = document.getElementById('viewport')!;
 		const newCanvas = document.createElement('canvas');
@@ -289,7 +288,6 @@ export class World {
 	}
 
 	update(dt: number) {
-
 		canvas2d.clearRect(0, 0, canvas.width, canvas.height);
 
 		this.updatePlayers(dt);
@@ -455,6 +453,7 @@ export class World {
 	}
 
 	private onPointerDown(e: PointerEvent) {
+		console.log('ye');
 		// If modal exists and click is inside it, do NOTHING here.
 		// Let Draw2D handle it.
 		if (this.modalObject) {

@@ -14,8 +14,6 @@ import com.g8e.gameserver.models.events.TradeEvent;
 import com.g8e.gameserver.models.objects.Edible;
 import com.g8e.gameserver.models.objects.Item;
 import com.g8e.gameserver.models.objects.Wieldable;
-import com.g8e.gameserver.models.quests.Quest;
-import com.g8e.gameserver.models.quests.QuestReward;
 import com.g8e.gameserver.network.actions.Action;
 import com.g8e.gameserver.network.actions.ChangeAppearanceAction;
 import com.g8e.gameserver.network.actions.attackStyle.ChangeAttackStyleAction;
@@ -54,8 +52,8 @@ public class Player extends Combatant {
 
     final public String username;
 
-    private transient static final int PLAYER_STARTING_X = 0;
-    private transient static final int PLAYER_STARTING_Y = 0;
+    private transient static final int PLAYER_STARTING_X = 17;
+    private transient static final int PLAYER_STARTING_Y = 27;
     public transient int accountID;
 
     public transient int inventoryChanged = 1;
@@ -92,15 +90,18 @@ public class Player extends Combatant {
     }
 
     private void loadQuestProgress(DBPlayer dbPlayer) {
-        for (int i = 0; i < dbPlayer.getQuestProgress().length; i++) {
-            this.questProgress[i] = dbPlayer.getQuestProgress()[i];
 
-            Quest quest = this.world.questsManager.getQuestByID(i);
-
-            if (dbPlayer.getQuestProgress()[i] == 100 && quest != null) {
-                influence += quest.getRewards().getInfluenceReward();
-            }
-        }
+        /*
+         * for (int i = 0; i < dbPlayer.getQuestProgress().length; i++) {
+         * this.questProgress[i] = dbPlayer.getQuestProgress()[i];
+         * 
+         * Quest quest = this.world.questsManager.getQuestByID(i);
+         * 
+         * if (dbPlayer.getQuestProgress()[i] == 100 && quest != null) {
+         * influence += quest.getRewards().getInfluenceReward();
+         * }
+         * }
+         */
 
     }
 
@@ -162,6 +163,22 @@ public class Player extends Combatant {
         }
 
         processMovement();
+
+        if (targetItemID != null) {
+            Item item = this.world.itemsManager.getItemByUniqueItemID(targetItemID);
+            if (item == null) {
+                this.world.chatMessages
+                        .add(new ChatMessage(this.username, "Too late, it's gone!", System.currentTimeMillis(), false));
+                clearWaypoints();
+                clearTarget();
+                return;
+            }
+
+            if (item.getWorldX() == this.worldX && item.getWorldY() == this.worldY) {
+                this.takeItem(targetItemID);
+            }
+
+        }
         if (this.targetedEntityID != null) {
             if (goalAction == null) {
                 Logger.printError("Goal action is null, but targeted entity is not null!");
@@ -1024,58 +1041,63 @@ public class Player extends Combatant {
     }
 
     private void questProgressUpdate(int questID, int progress) {
-        if (questID < 0 || questID >= this.questProgress.length) {
-            Logger.printError("Invalid quest ID");
-            return;
-        }
 
-        this.questProgress[questID] = progress;
-        saveQuestProgress();
-
-        if (progress == 100) { // 100 is the completion value
-            ChatMessage chatMessage = new ChatMessage(this.username, "Congratulations, you've completed a quest!",
-                    System.currentTimeMillis(), false);
-
-            this.world.chatMessages.add(chatMessage);
-            SoundEvent soundEvent = new SoundEvent("quest_complete.ogg", true, true, this.entityID, false);
-            this.world.tickSoundEvents.add(soundEvent);
-            Quest quest = this.world.questsManager.getQuestByID(questID);
-            QuestReward reward = quest.getRewards();
-            influence += reward.getInfluenceReward();
-            int[] skillRewards = reward.getSkillRewards();
-
-            for (int i = 0; i < skillRewards.length; i++) {
-                this.addXp(i, skillRewards[i]);
-            }
-
-            int[] itemRewards = reward.getItemRewards();
-            for (int itemID : itemRewards) {
-                int emptySlot = getEmptyInventorySlot();
-
-                if (emptySlot == -1) {
-                    Logger.printError("No empty inventory slots, dropping item");
-                    this.world.itemsManager.spawnItem(this.worldX, this.worldY, itemID);
-                    return;
-                }
-
-                Item item = this.world.itemsManager.getItemByID(itemID);
-
-                if (item == null) {
-                    Logger.printError("Item not found");
-                    return;
-                }
-
-                this.inventory[emptySlot] = itemID;
-                if (item.isStackable()) {
-                    this.inventoryAmounts[emptySlot] = item.getAmount();
-                }
-
-                saveInventory();
-                this.inventoryChanged = 1;
-                this.inventoryAmountsChanged = 1;
-            }
-
-        }
+        /*
+         * if (questID < 0 || questID >= this.questProgress.length) {
+         * Logger.printError("Invalid quest ID");
+         * return;
+         * }
+         * 
+         * this.questProgress[questID] = progress;
+         * saveQuestProgress();
+         * 
+         * if (progress == 100) { // 100 is the completion value
+         * ChatMessage chatMessage = new ChatMessage(this.username,
+         * "Congratulations, you've completed a quest!",
+         * System.currentTimeMillis(), false);
+         * 
+         * this.world.chatMessages.add(chatMessage);
+         * SoundEvent soundEvent = new SoundEvent("quest_complete.ogg", true, true,
+         * this.entityID, false);
+         * this.world.tickSoundEvents.add(soundEvent);
+         * Quest quest = this.world.questsManager.getQuestByID(questID);
+         * QuestReward reward = quest.getRewards();
+         * influence += reward.getInfluenceReward();
+         * int[] skillRewards = reward.getSkillRewards();
+         * 
+         * for (int i = 0; i < skillRewards.length; i++) {
+         * this.addXp(i, skillRewards[i]);
+         * }
+         * 
+         * int[] itemRewards = reward.getItemRewards();
+         * for (int itemID : itemRewards) {
+         * int emptySlot = getEmptyInventorySlot();
+         * 
+         * if (emptySlot == -1) {
+         * Logger.printError("No empty inventory slots, dropping item");
+         * this.world.itemsManager.spawnItem(this.worldX, this.worldY, itemID);
+         * return;
+         * }
+         * 
+         * Item item = this.world.itemsManager.getItemByID(itemID);
+         * 
+         * if (item == null) {
+         * Logger.printError("Item not found");
+         * return;
+         * }
+         * 
+         * this.inventory[emptySlot] = itemID;
+         * if (item.isStackable()) {
+         * this.inventoryAmounts[emptySlot] = item.getAmount();
+         * }
+         * 
+         * saveInventory();
+         * this.inventoryChanged = 1;
+         * this.inventoryAmountsChanged = 1;
+         * }
+         * 
+         * }
+         */
     }
 
     private int getEmptyInventorySlot() {

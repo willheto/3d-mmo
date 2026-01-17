@@ -47,7 +47,7 @@ interface SocketPlayer extends SocketEntity {
 	username: string;
 }
 
-type Direction = 'UP' | 'DOWN' | 'LEFT' | 'RIGHT' | 'NONE';
+type Direction = 'UP' | 'DOWN' | 'LEFT' | 'RIGHT' | 'UP_LEFT' | 'UP_RIGHT' | 'DOWN_LEFT' | 'DOWN_RIGHT' | 'NONE';
 
 interface SocketEntity {
 	entityID: string;

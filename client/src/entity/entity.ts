@@ -3,25 +3,38 @@ import { World } from '../world/World';
 import { ExperienceUtils } from '../util/ExperienceCurve';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 import Cache from '../cache/index';
+import Draw2D from '../graphics/Draw2D';
+import { canvas2d } from '../graphics/2DCanvas';
+
+type Direction = 'NONE' | 'UP' | 'DOWN' | 'LEFT' | 'RIGHT' | 'UP_LEFT' | 'UP_RIGHT' | 'DOWN_LEFT' | 'DOWN_RIGHT';
+
+const DIR_VECS: Record<Direction, { dx: number; dy: number }> = {
+	NONE: { dx: 0, dy: 0 },
+	UP: { dx: 0, dy: -1 },
+	DOWN: { dx: 0, dy: 1 },
+	LEFT: { dx: -1, dy: 0 },
+	RIGHT: { dx: 1, dy: 0 },
+	UP_LEFT: { dx: -1, dy: -1 },
+	UP_RIGHT: { dx: 1, dy: -1 },
+	DOWN_LEFT: { dx: -1, dy: 1 },
+	DOWN_RIGHT: { dx: 1, dy: 1 },
+};
 
 export class Entity {
 	protected readonly MODEL_YAW_OFFSET = -Math.PI;
 	protected readonly SPEED = 1.6;
 	protected readonly STOP_RADIUS = 0.08;
 	protected readonly TURN_SPEED = 6;
+	protected readonly DEATH_DURATION = 0.6; // seconds
+	protected readonly TICK_DURATION = 0.6; // must match server (600ms)
+	protected readonly ATTACK_DURATION = 0.25; // seconds
 
-	protected isAddedToScene = false;
-	private legHeight = 1.05;
-	private legTopWidth = 0.25;
-	private legBottomWidth = 0.35;
-	private legDepth = 0.22;
+	protected attackTimer: number = 0;
 
 	protected deathTimer: number = 0;
-	protected readonly DEATH_DURATION = 0.6; // seconds
 	protected hasDied: boolean = false;
 
 	protected world: World;
-	public nextTileDirection: Direction = 'NONE';
 	public entityID: string;
 	public worldX: number = 0;
 	public worldY: number = 0;
@@ -29,7 +42,6 @@ export class Entity {
 	protected lastTickY = 0;
 
 	protected interpTime = 0;
-	protected readonly TICK_DURATION = 0.6; // must match server (600ms)
 
 	public name: string = '';
 	public type: number = 0;
@@ -44,18 +56,19 @@ export class Entity {
 	public examine: string = '';
 
 	public weapon: number = -1;
-	public helmet: number = -1;
 	public shield: number = -1;
-	public bodyArmor: number = -1;
-	public legArmor: number = -1;
-	public gloves: number = -1;
-	public boots: number = -1;
-	public neckwear: number = -1;
-	public ring: number = -1;
+
+	public model = new THREE.Group();
+
 	protected equippedWeapon: THREE.Object3D | null = null;
 	protected equippedShield: THREE.Object3D | null = null;
 
-	public model = new THREE.Group();
+	protected isAddedToScene = false;
+	private legHeight = 1.05;
+	private legTopWidth = 0.25;
+	private legBottomWidth = 0.35;
+	private legDepth = 0.22;
+
 	public limbs!: {
 		leftArm: THREE.Group;
 		rightArm: THREE.Group;
@@ -75,6 +88,40 @@ export class Entity {
 	constructor(world: World, entityID: string) {
 		this.entityID = entityID;
 		this.world = world;
+	}
+
+	public update(entity: SocketEntity) {
+		if (entity.lastTickX !== undefined && entity.lastTickY !== undefined) {
+			this.lastTickX = entity.lastTickX;
+			this.lastTickY = entity.lastTickY;
+			this.interpTime = 0;
+		}
+
+		if (entity.worldX !== undefined) this.worldX = entity.worldX;
+		if (entity.worldY !== undefined) this.worldY = entity.worldY;
+		if (entity.facingDirection !== undefined) this.facingDirection = entity.facingDirection;
+		if (entity.currentHitpoints !== undefined) this.currentHitpoints = entity.currentHitpoints;
+		if (entity.isDying !== undefined) this.isDying = entity.isDying;
+		if (entity.isInCombat !== undefined) this.isInCombat = entity.isInCombat;
+		if (entity.isDying !== undefined && entity.isDying === false && this.hasDied) this.resetPose();
+
+		// handle attack events first
+
+		// then death
+		if (this.isDying && !this.hasDied) {
+			if (this.attackTimer > 0) {
+				// wait
+			} else {
+				this.deathTimer = this.DEATH_DURATION;
+				this.hasDied = true;
+				this.attackTimer = 0; // hard cancel any late-start
+			}
+		}
+
+		if (!this.isAddedToScene) {
+			this.world.scene.add(this.model);
+			this.isAddedToScene = true;
+		}
 	}
 
 	protected resetPose(): void {
@@ -115,17 +162,9 @@ export class Entity {
 		return this.wrapAngleRad(a);
 	}
 
-	protected getYawFromFacing(dir: 'UP' | 'DOWN' | 'LEFT' | 'RIGHT'): number {
-		switch (dir) {
-			case 'DOWN':
-				return 0; // +Z
-			case 'UP':
-				return Math.PI; // -Z
-			case 'RIGHT':
-				return Math.PI / 2; // +X
-			case 'LEFT':
-				return -Math.PI / 2; // -X
-		}
+	protected yawFromFacing(dir: Direction): number {
+		const { dx, dy } = DIR_VECS[dir];
+		return Math.atan2(-dx, dy);
 	}
 
 	protected makeZombieModel(): void {
@@ -277,7 +316,6 @@ export class Entity {
 			side: THREE.DoubleSide,
 		});
 
-		// Single triangle geometry
 		const eyeGeo = new THREE.BufferGeometry();
 		const vertices = new Float32Array([
 			-0.06,
@@ -341,7 +379,6 @@ export class Entity {
 
 		this.limbs.rightHand.remove(this.equippedWeapon);
 
-		// Optional but correct: free GPU memory
 		this.equippedWeapon.traverse(obj => {
 			if ((obj as THREE.Mesh).geometry) {
 				(obj as THREE.Mesh).geometry.dispose();
@@ -364,7 +401,6 @@ export class Entity {
 
 		this.limbs.leftHand.remove(this.equippedShield);
 
-		// Optional but correct: free GPU memory
 		this.equippedShield?.traverse(obj => {
 			if ((obj as THREE.Mesh).geometry) {
 				(obj as THREE.Mesh).geometry.dispose();
@@ -385,7 +421,6 @@ export class Entity {
 	private attachShield(shield: THREE.Object3D): void {
 		if (!this.limbs.leftHand) return;
 
-		// Remove existing weapon first
 		this.removeShield();
 
 		shield.position.set(0, 0, 0);
@@ -399,7 +434,6 @@ export class Entity {
 	private attachWeapon(weapon: THREE.Object3D): void {
 		if (!this.limbs.rightHand) return;
 
-		// Remove existing weapon first
 		this.removeWeapon();
 
 		weapon.position.set(0, 0, 0);
@@ -560,5 +594,135 @@ export class Entity {
 		const melee = 0.325 * (attackLevel + strengthLevel);
 
 		return Math.floor(base + melee);
+	}
+
+	protected draw(dt: number): void {
+		if (!this.limbs) return;
+
+		if (this.hasDied && this.deathTimer > 0 && this.limbs) {
+			this.deathTimer -= dt;
+
+			const t = 1 - this.deathTimer / this.DEATH_DURATION;
+			const ease = t * t; // quadratic ease-in
+
+			// Fall forward
+			this.model.rotation.x = THREE.MathUtils.lerp(0, -Math.PI / 2.2, ease);
+
+			// Slight sideways twist (looks more natural)
+			this.model.rotation.z = THREE.MathUtils.lerp(0, 0.25, ease);
+
+			// Collapse limbs
+			this.limbs.leftArm.rotation.x = THREE.MathUtils.lerp(this.limbs.leftArm.rotation.x, -Math.PI * 0.9, ease);
+			this.limbs.rightArm.rotation.x = THREE.MathUtils.lerp(this.limbs.rightArm.rotation.x, -Math.PI * 0.9, ease);
+
+			this.limbs.leftLeg.rotation.x = THREE.MathUtils.lerp(this.limbs.leftLeg.rotation.x, Math.PI * 0.4, ease);
+			this.limbs.rightLeg.rotation.x = THREE.MathUtils.lerp(this.limbs.rightLeg.rotation.x, Math.PI * 0.2, ease);
+
+			return; // HARD STOP — no walking / attacking
+		}
+
+		if (this.hasDied && this.deathTimer <= 0) {
+			// Lock corpse pose
+			this.model.rotation.x = -Math.PI / 2.2;
+			this.model.rotation.z = 0.25;
+
+			for (const limb of Object.values(this.limbs)) {
+				limb.rotation.x *= 0.95;
+			}
+
+			return;
+		}
+
+		const playerAttackEvents = this.world.attackEvents.filter(e => e.attackerID === this.entityID);
+
+		if (playerAttackEvents.length > 0 && this.attackTimer <= 0 && !this.isDying && !this.hasDied) {
+			this.attackTimer = this.ATTACK_DURATION;
+			this.world.attackEvents = this.world.attackEvents.filter(e => e.attackerID !== this.entityID);
+		}
+
+		if (this.attackTimer > 0 && !this.hasDied && !this.isDying && this.limbs) {
+			this.attackTimer -= dt;
+
+			const t = 1 - this.attackTimer / this.ATTACK_DURATION;
+			// Fast forward swing: ease-out
+			const swing = Math.sin(t * -Math.PI) * 1.4;
+
+			// Decide attack arm (right-handed)
+			this.limbs.rightArm.rotation.x = -swing;
+			this.limbs.leftArm.rotation.x = swing * 0.25;
+
+			// Slight torso involvement (optional but looks better)
+			this.model.rotation.y += Math.sin(t * Math.PI) * 0.05;
+
+			// Lock legs during attack
+			this.limbs.leftLeg.rotation.x *= 0.5;
+			this.limbs.rightLeg.rotation.x *= 0.5;
+		}
+
+		if (this.isInCombat) {
+			const worldPos = this.model.position.clone();
+			worldPos.y += 3.2; // above head
+
+			const screenPos = worldPos.project(this.world.camera);
+
+			const screenX = (screenPos.x * 0.5 + 0.5) * canvas2d.canvas.width;
+			const screenY = (-screenPos.y * 0.5 + 0.5) * canvas2d.canvas.height;
+
+			const hitpoints = ExperienceUtils.getLevelByExp(this.skills[3]);
+
+			Draw2D.drawHealthBar2D(screenX | 0, screenY | 0, this.currentHitpoints, hitpoints);
+		}
+
+		this.interpTime += dt;
+
+		const alpha = THREE.MathUtils.clamp(this.interpTime / this.TICK_DURATION, 0, 1);
+
+		const dx = Math.abs(this.worldX - this.lastTickX);
+		const dy = Math.abs(this.worldY - this.lastTickY);
+		const dist = Math.max(dx, dy);
+
+		if (dist > 1) {
+			const h = this.world.tileManager.getTileHeight(this.worldX, this.worldY);
+			this.model.position.set(this.worldX * this.world.TILE_SIZE, h, this.worldY * this.world.TILE_SIZE);
+		} else {
+			const ix = THREE.MathUtils.lerp(this.lastTickX, this.worldX, alpha);
+			const iy = THREE.MathUtils.lerp(this.lastTickY, this.worldY, alpha);
+
+			const tx = Math.round(ix);
+			const tz = Math.round(iy);
+			const h = this.world.tileManager.getTileHeight(tx, tz);
+
+			this.model.position.set(ix * this.world.TILE_SIZE, h, iy * this.world.TILE_SIZE);
+		}
+
+		const moving = dist <= 1 && alpha < 1; // within-tick interpolation active
+
+		if (moving && this.attackTimer <= 0 && !this.hasDied) {
+			this.walkTime += dt * 8;
+			const swing = Math.sin(this.walkTime) * 0.6;
+
+			this.limbs.leftArm.rotation.x = swing;
+			this.limbs.rightArm.rotation.x = -swing;
+			this.limbs.leftLeg.rotation.x = -swing;
+			this.limbs.rightLeg.rotation.x = swing;
+		} else {
+			// settle limbs when idle (but not during attack/death returns)
+			for (const limb of Object.values(this.limbs)) {
+				limb.rotation.x *= 0.8;
+			}
+		}
+
+		if (this.facingDirection) {
+			const raw = this.yawFromFacing(this.facingDirection as Direction);
+
+			const INVERT_YAW = true;
+			const desiredYaw = this.normalizeYaw((INVERT_YAW ? -raw : raw) + this.MODEL_YAW_OFFSET);
+
+			const currentYaw = this.normalizeYaw(this.model.rotation.y);
+			const delta = this.wrapAngleRad(desiredYaw - currentYaw);
+
+			this.model.rotation.y =
+				currentYaw + THREE.MathUtils.clamp(delta, -this.TURN_SPEED * dt, this.TURN_SPEED * dt);
+		}
 	}
 }
